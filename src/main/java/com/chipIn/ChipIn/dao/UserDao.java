@@ -3,6 +3,7 @@ package com.chipIn.ChipIn.dao;
 import com.chipIn.ChipIn.entities.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,13 +13,14 @@ import java.util.UUID;
 
 @Repository
 @Transactional
-public class UserDaoImpl {
+public class UserDao {
 
     @PersistenceContext
     private EntityManager entityManager;
 
     public List<User> getUsers(){
-        return entityManager.createQuery("SELECT u FROM User u", User.class).getResultList();
+        TypedQuery<User> query = entityManager.createQuery("SELECT u FROM User u", User.class);
+        return query.getResultList();
     }
 
     public UUID addUser(User userData){
@@ -36,7 +38,10 @@ public class UserDaoImpl {
         }
 
         return createdUser.getUserId();
-//        return entityManager.createQuery("Select u.userId from User u", User.class).getSingleResult().getUserId();
+    }
+
+    public User getUserById(UUID userId){
+        return entityManager.find(User.class, userId);
     }
 
 }

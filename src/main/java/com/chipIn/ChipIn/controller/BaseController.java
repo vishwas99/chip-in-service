@@ -1,6 +1,7 @@
 package com.chipIn.ChipIn.controller;
 
 import com.chipIn.ChipIn.util.ErrorResponse;
+import com.chipIn.ChipIn.util.ResponseWrapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,5 +21,4 @@ public class BaseController {
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
-
 }

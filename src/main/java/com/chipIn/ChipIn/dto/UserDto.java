@@ -37,4 +37,11 @@ public class UserDto {
         return user;
     }
 
+    public UserDto(User user) {
+        this.name = user.getName();
+        this.email = user.getEmail();
+        this.phoneNumber = user.getPhone();
+        this.createdAt = user.getCreatedAt();
+    }
+
 }

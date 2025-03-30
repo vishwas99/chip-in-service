@@ -20,11 +20,6 @@ import java.util.UUID;
 @Validated
 public class UserController extends BaseController {
 
-    /**
-     * GET /users
-     * @return
-     */
-
     @Autowired
     private UserService userService;
 
@@ -37,6 +32,11 @@ public class UserController extends BaseController {
     public ResponseEntity<ResponseWrapper<UUID>> addUser(@RequestBody UserDto userData){
         userData.setCreatedAt(LocalDateTime.now());
         return ResponseEntity.ok(ResponseWrapper.success(userService.addUser(userData.toEntity())));
+    }
+
+    @GetMapping("/getUserById")
+    public ResponseEntity<ResponseWrapper<UserDto>> getUserById(@RequestParam("id") UUID userId){
+        return ResponseEntity.ok(ResponseWrapper.success(userService.getUserById(userId)));
     }
 
 

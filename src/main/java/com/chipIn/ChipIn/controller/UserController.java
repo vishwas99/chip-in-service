@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+//import com.ey.springboot3security.service.JwtService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,12 @@ public class UserController extends BaseController {
 
     @Autowired
     private UserService userService;
+
+//    @Autowired
+//    private UserInfoService service;
+//
+//    @Autowired
+//    private JwtService jwtService;
 
     @GetMapping("/list")
     public ResponseEntity<ResponseWrapper<List<User>>> getUsers(){

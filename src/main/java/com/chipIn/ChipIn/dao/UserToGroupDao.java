@@ -55,5 +55,19 @@ public class UserToGroupDao {
         }
     }
 
+    public Set<UUID> getGroupsByUserId(UUID userId){
+        try{
+            String sql = "SELECT groupid FROM chipin.user_groups WHERE userid=:userId";
+            return (Set<UUID>) entityManager.createNativeQuery(sql)
+                    .setParameter("userId", userId)
+                    .getResultStream()
+                    .map(obj -> (UUID) obj)
+                    .collect(Collectors.toSet());
+        }catch (Exception e){
+            log.error("Error fetching GroupIds from UserId : {} ", userId);
+            throw new RuntimeException("Error while fetching groups", e);
+        }
+    }
+
 
 }

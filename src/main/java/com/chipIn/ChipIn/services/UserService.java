@@ -2,6 +2,7 @@ package com.chipIn.ChipIn.services;
 
 import com.chipIn.ChipIn.dao.UserDao;
 import com.chipIn.ChipIn.dto.UserDto;
+import com.chipIn.ChipIn.entities.Group;
 import com.chipIn.ChipIn.entities.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

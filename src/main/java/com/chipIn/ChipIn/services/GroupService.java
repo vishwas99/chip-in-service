@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -41,6 +42,11 @@ public class GroupService {
 
     public Group getGroupById(UUID groupId){
         return groupDao.getGroupData(groupId);
+    }
+
+    public List<Group> getGroupsByUserId(UUID userId){
+
+        return new ArrayList<>(groupDao.getGroupsByUserId(userId));
     }
 
 }

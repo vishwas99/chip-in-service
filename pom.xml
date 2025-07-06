@@ -51,7 +51,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>42.7.5</version>
+<!--			<version>42.7.5</version>-->
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -66,7 +66,7 @@
 		<dependency>
 			<groupId>jakarta.validation</groupId>
 			<artifactId>jakarta.validation-api</artifactId>
-			<version>3.1.1</version>
+<!--			<version>3.1.1</version>-->
 		</dependency>
 <!--		For Spring User Auth-->
 		<dependency>

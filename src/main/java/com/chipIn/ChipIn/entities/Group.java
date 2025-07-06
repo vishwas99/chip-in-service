@@ -14,6 +14,7 @@ import java.util.UUID;
 @Setter
 @ToString
 @RequiredArgsConstructor
+@EqualsAndHashCode
 public class Group {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

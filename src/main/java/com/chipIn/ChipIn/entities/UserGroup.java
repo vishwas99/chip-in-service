@@ -6,15 +6,12 @@ import lombok.Setter;
 import java.util.UUID;
 
 @Entity
-@Table(name = "user_groups", schema = "chipin") // ✅ Ensure correct table mapping
+@Table(name = "user_groups", schema = "chipin")
 @Getter
 @Setter
 public class UserGroup {
-    @Id
+    @EmbeddedId
     @Column(name = "userid", nullable = false)
-    private UUID userId;
+    private UserGroupsId userGroupsId;
 
-    @Id
-    @Column(name = "groupid", nullable = false)
-    private UUID groupId;
 }

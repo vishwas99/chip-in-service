@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.controller;
 
+import com.chipIn.ChipIn.dto.GroupDto;
 import com.chipIn.ChipIn.dto.UserDto;
 import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.services.UserService;
@@ -45,7 +46,6 @@ public class UserController extends BaseController {
     public ResponseEntity<ResponseWrapper<UserDto>> getUserById(@RequestParam("id") UUID userId){
         return ResponseEntity.ok(ResponseWrapper.success(userService.getUserById(userId)));
     }
-
 
 
 }

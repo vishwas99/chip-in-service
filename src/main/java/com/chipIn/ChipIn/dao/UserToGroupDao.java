@@ -1,8 +1,14 @@
 package com.chipIn.ChipIn.dao;
 
 import com.chipIn.ChipIn.dto.UserToGroupDto;
+import com.chipIn.ChipIn.entities.User;
+import com.chipIn.ChipIn.entities.UserGroup;
+import com.chipIn.ChipIn.entities.UserGroupsId;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,6 +72,39 @@ public class UserToGroupDao {
         }catch (Exception e){
             log.error("Error fetching GroupIds from UserId : {} ", userId);
             throw new RuntimeException("Error while fetching groups", e);
+        }
+    }
+
+    public float getUserGroupMoneyOwed(UUID userId, UUID groupId){
+        try{
+            String sql = "SELECT moneyowed FROM chipin.user_groups WHERE userid=:userId and groupid=:groupId";
+            return (float) entityManager.createNativeQuery(sql)
+                    .setParameter("userId", userId)
+                    .setParameter("groupId", groupId)
+                    .getSingleResult();
+        } catch (Exception e){
+            throw e;
+        }
+    }
+
+    public void setUserGroupMoneyOwed(UUID userId, UUID groupId, Double amountToBeAdded){
+        try{
+
+            UserGroupsId userGroupsId = new UserGroupsId(userId, groupId);
+
+            CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+            CriteriaQuery<UserGroup> cq = cb.createQuery(UserGroup.class);
+            Root<UserGroup> root = cq.from(UserGroup.class);
+            cq.select(root).where(cb.equal(root.get("userGroupsId"), userGroupsId));
+
+            UserGroup userGroup = entityManager.createQuery(cq).getResultStream().findFirst().orElse(null);
+
+            if(userGroup != null){
+                userGroup.setMoneyOwed(userGroup.getMoneyOwed() + amountToBeAdded);
+                entityManager.persist(userGroup);
+            }
+        }catch (Exception e){
+            throw e;
         }
     }
 

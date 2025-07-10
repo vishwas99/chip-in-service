@@ -21,7 +21,7 @@ import java.util.Map;
 
 @RestController
 //@RequestMapping()
-public class LoginController {
+public class LoginController extends BaseController {
 
     private final AuthenticationManager authenticationManager;
 

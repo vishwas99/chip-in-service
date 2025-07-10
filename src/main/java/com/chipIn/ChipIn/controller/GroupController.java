@@ -2,6 +2,7 @@ package com.chipIn.ChipIn.controller;
 
 import com.chipIn.ChipIn.dto.ExpenseDto;
 import com.chipIn.ChipIn.dto.GroupDto;
+import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.dto.UserToGroupDto;
 import com.chipIn.ChipIn.entities.Group;
 import com.chipIn.ChipIn.services.ExpenseService;
@@ -57,7 +58,8 @@ public class GroupController extends BaseController {
     }
 
     @GetMapping("/getGroupsByUserId")
-    public ResponseEntity<ResponseWrapper<List<Group>>> getGroupsByUserId(@RequestParam("userId") UUID userId) {
+    public ResponseEntity<ResponseWrapper<List<UserGroupResponse>>> getGroupsByUserId(@RequestParam("userId") UUID userId) {
         return ResponseEntity.ok(ResponseWrapper.success(groupService.getGroupsByUserId(userId)));
     }
+
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import java.util.UUID;
+import com.chipIn.ChipIn.entities.UserGroupsId;
 
 @Entity
 @Table(name = "user_groups", schema = "chipin")
@@ -11,7 +12,8 @@ import java.util.UUID;
 @Setter
 public class UserGroup {
     @EmbeddedId
-    @Column(name = "userid", nullable = false)
     private UserGroupsId userGroupsId;
 
+    @Column(name = "moneyowed")
+    private Double moneyOwed;
 }

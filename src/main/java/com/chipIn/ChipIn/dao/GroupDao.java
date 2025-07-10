@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.dao;
 
+import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.entities.Group;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
@@ -12,10 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Repository
@@ -55,12 +53,21 @@ public class GroupDao {
         return new HashSet<>(entityManager.createQuery(cq).getResultList());
     }
 
-    public Set<Group> getGroupsByUserId(UUID userId){
+    public List<UserGroupResponse> getGroupsByUserId(UUID userId){
 //       Get all groupId given userId
         Set<UUID> groupIds = userToGroupDao.getGroupsByUserId(userId);
 
-//        Get all groups given List of groupIds
-        return getGroupSet(groupIds);
+        List<UserGroupResponse> userGroupResponses = new ArrayList<>();
 
+//        Get all groups given List of groupIds
+        Set<Group> groups = getGroupSet(groupIds);
+//        Get UserGroup MoneyOwed for each group of the user
+        for(Group group: groups){
+            UserGroupResponse u = new UserGroupResponse();
+            u.setGroup(group);
+            u.setMoneyOwed(userToGroupDao.getUserGroupMoneyOwed(userId, group.getGroupId()));
+            userGroupResponses.add(u);
+        }
+        return userGroupResponses;
     }
 }

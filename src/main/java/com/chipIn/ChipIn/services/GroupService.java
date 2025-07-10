@@ -3,6 +3,7 @@ package com.chipIn.ChipIn.services;
 import com.chipIn.ChipIn.dao.GroupDao;
 import com.chipIn.ChipIn.dao.UserToGroupDao;
 import com.chipIn.ChipIn.dto.GroupDto;
+import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.dto.UserToGroupDto;
 import com.chipIn.ChipIn.entities.Group;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,9 +45,9 @@ public class GroupService {
         return groupDao.getGroupData(groupId);
     }
 
-    public List<Group> getGroupsByUserId(UUID userId){
+    public List<UserGroupResponse> getGroupsByUserId(UUID userId){
 
-        return new ArrayList<>(groupDao.getGroupsByUserId(userId));
+        return groupDao.getGroupsByUserId(userId);
     }
 
 }

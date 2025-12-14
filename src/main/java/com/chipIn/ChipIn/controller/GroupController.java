@@ -57,7 +57,7 @@ public class GroupController extends BaseController {
         return null;
     }
 
-    @GetMapping("/getGroupsByUserId")
+    @GetMapping("/users")
     public ResponseEntity<ResponseWrapper<List<UserGroupResponse>>> getGroupsByUserId(@RequestParam("userId") UUID userId) {
         return ResponseEntity.ok(ResponseWrapper.success(groupService.getGroupsByUserId(userId)));
     }

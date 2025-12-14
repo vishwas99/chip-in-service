@@ -1,19 +1,21 @@
 package com.chipIn.ChipIn.services;
 
+import com.chipIn.ChipIn.dao.CurrencyExchangeDao;
 import com.chipIn.ChipIn.dao.ExpenseDao;
+import com.chipIn.ChipIn.dao.SplitsDao;
 import com.chipIn.ChipIn.dao.UserToGroupDao;
 import com.chipIn.ChipIn.dto.ExpenseDto;
 import com.chipIn.ChipIn.dto.SplitDto;
 import com.chipIn.ChipIn.dto.UserGroupResponse;
+import com.chipIn.ChipIn.entities.Currency;
+import com.chipIn.ChipIn.entities.Expense;
+import com.chipIn.ChipIn.entities.Split;
 import com.chipIn.ChipIn.entities.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -26,7 +28,13 @@ public class ExpenseService {
     private ExpenseDao expenseDao;
 
     @Autowired
+    private CurrencyExchangeDao currencyExchangeDao;
+
+    @Autowired
     private UserToGroupDao userToGroupDao;
+
+    @Autowired
+    private SplitsDao splitsDao;
 
     public void addExpense(ExpenseDto expenseDto){
         // Logic to add expense to the group
@@ -34,8 +42,15 @@ public class ExpenseService {
         // 1. Validate all users in split
         Set<UUID> groupMembers = groupService.getUserByGroupId(expenseDto.getGroupId());
 
+        //1.1 Validate CurrencyId
+        Currency currency = currencyExchangeDao.getCurrency(expenseDto.getCurrencyId());
+        if(null == currency){
+            throw new RuntimeException("Invalid Currency provided for the Expense");
+        }
+
+
         // 2. Calculate exact amount split for each user
-        Double totalAmount = expenseDto.getAmount();
+        Float totalAmount = expenseDto.getAmount();
         for(SplitDto splitDto : expenseDto.getExpenseSplit()){
             if(!groupMembers.contains(splitDto.getUserId())){
                 throw new RuntimeException("Invalid Users in Expense split found");
@@ -64,4 +79,18 @@ public class ExpenseService {
         }
     }
 
+    public List<Expense> getExpensesByGroupId(UUID groupId){
+        return expenseDao.getExpensesByGroupId(groupId);
+    }
+
+    public List<Split> getExpensesByUserId(UUID userId){
+        // Get All expense Splits for the UserId groupBy groupId
+
+
+        // From Splits get money value of each Split from ExpenseTable
+
+        // Tally and Return Response
+
+        return splitsDao.getAllSplitsByUserId(userId);
+    }
 }

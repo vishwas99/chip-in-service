@@ -9,7 +9,7 @@ import java.util.UUID;
 public class SplitDto {
 
     private UUID userId;
-    private Double amount;
+    private Float amount;
 
     public Split toEntity() {
         Split split = new Split();

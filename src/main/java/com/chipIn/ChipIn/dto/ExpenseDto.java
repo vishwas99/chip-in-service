@@ -24,7 +24,7 @@ public class ExpenseDto {
 
     @NotNull(message = "Paid by cannot be null")
     @Positive(message = "Paid by must be a positive number and >0")
-    private Double amount;
+    private float amount;
 
     private String description;
 
@@ -35,6 +35,9 @@ public class ExpenseDto {
     @NotNull(message = "Expense split cannot be null")
     private List<SplitDto> expenseSplit;
 
+    @NotNull(message = "Currency is not provided")
+    private UUID currencyId;
+
     public Expense toEntity() {
         Expense expense = new Expense();
         expense.setName(this.expenseName);
@@ -43,6 +46,7 @@ public class ExpenseDto {
         expense.setDescription(this.description);
         expense.setGroupId(this.groupId);
         expense.setDate(LocalDateTime.now());
+        expense.setCurrencyId(this.currencyId);
         List<Split> splits = new ArrayList<>();
         for (SplitDto splitDto : this.expenseSplit) {
             Split newSplit = splitDto.toEntity();

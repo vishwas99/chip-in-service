@@ -15,5 +15,5 @@ public class UserGroup {
     private UserGroupsId userGroupsId;
 
     @Column(name = "moneyowed")
-    private Double moneyOwed;
+    private float moneyOwed;
 }

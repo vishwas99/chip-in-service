@@ -63,7 +63,7 @@ public class UserToGroupDao {
 
     public Set<UUID> getGroupsByUserId(UUID userId){
         try{
-            String sql = "SELECT groupid FROM chipin.user_groups WHERE userid=:userId";
+            String sql = "SELECT groupid FROM user_groups WHERE userid=:userId";
             return (Set<UUID>) entityManager.createNativeQuery(sql)
                     .setParameter("userId", userId)
                     .getResultStream()
@@ -87,7 +87,7 @@ public class UserToGroupDao {
         }
     }
 
-    public void setUserGroupMoneyOwed(UUID userId, UUID groupId, Double amountToBeAdded){
+    public void setUserGroupMoneyOwed(UUID userId, UUID groupId, float amountToBeAdded){
         try{
 
             UserGroupsId userGroupsId = new UserGroupsId(userId, groupId);

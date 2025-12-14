@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.dao;
 
+import com.chipIn.ChipIn.dto.GroupExpenseDto;
 import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.entities.Group;
 import jakarta.persistence.Entity;
@@ -57,6 +58,8 @@ public class GroupDao {
 //       Get all groupId given userId
         Set<UUID> groupIds = userToGroupDao.getGroupsByUserId(userId);
 
+        log.info("All Groups for given  user : " + userId + " " + groupIds.toString());
+
         List<UserGroupResponse> userGroupResponses = new ArrayList<>();
 
 //        Get all groups given List of groupIds
@@ -65,7 +68,9 @@ public class GroupDao {
         for(Group group: groups){
             UserGroupResponse u = new UserGroupResponse();
             u.setGroup(group);
-            u.setMoneyOwed(userToGroupDao.getUserGroupMoneyOwed(userId, group.getGroupId()));
+            GroupExpenseDto groupExpenseDto = new GroupExpenseDto();
+//            groupExpenseDto.setCurrency();
+//            u.setMoneyOwed(userToGroupDao.getUserGroupMoneyOwed(userId, group.getGroupId()));
             userGroupResponses.add(u);
         }
         return userGroupResponses;

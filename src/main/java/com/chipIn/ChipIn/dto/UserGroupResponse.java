@@ -11,6 +11,6 @@ import lombok.ToString;
 public class UserGroupResponse {
 
     private Group group;
-    private float moneyOwed;
+    private GroupExpenseDto groupExpense;
 
 }

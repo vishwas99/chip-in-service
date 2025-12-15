@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.controller;
 
+import com.chipIn.ChipIn.dto.UserExpensesDto;
 import com.chipIn.ChipIn.entities.Expense;
 import com.chipIn.ChipIn.entities.Split;
 import com.chipIn.ChipIn.services.ExpenseService;
@@ -27,8 +28,13 @@ public class ExpenseController {
     }
 
     @GetMapping("/user")
-    public ResponseEntity<ResponseWrapper<List<Split>>> getExpensesByUserId(@RequestParam UUID userId){
+    public ResponseEntity<ResponseWrapper<UserExpensesDto>> getExpensesByUserId(@RequestParam UUID userId){
         return ResponseEntity.ok(ResponseWrapper.success(expenseService.getExpensesByUserId(userId)));
+    }
+
+    @GetMapping("/user-group")
+    public ResponseEntity<ResponseWrapper<List<Split>>> getExpensesByUserIdAndGroupId(@RequestParam UUID userId, @RequestParam UUID groupId){
+        return ResponseEntity.ok(ResponseWrapper.success(expenseService.getExpensesByUserIdAndGroupId(userId, groupId)));
     }
 
 }

@@ -1,6 +1,8 @@
 package com.chipIn.ChipIn.entities;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -18,6 +20,7 @@ import java.util.UUID;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Split {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -34,7 +37,7 @@ public class Split {
 
     @ManyToOne
     @JoinColumn(name = "expenseid", nullable = false)
-    @JsonBackReference
+    @JsonManagedReference
     private Expense expense;
 
 }

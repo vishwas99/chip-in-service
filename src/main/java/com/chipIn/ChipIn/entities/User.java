@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.proxy.HibernateProxy;
@@ -13,6 +14,7 @@ import java.util.UUID;
 @Setter
 @RequiredArgsConstructor
 @Table(name = "users", schema = "chipin")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class User {
 
     @Id

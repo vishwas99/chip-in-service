@@ -1,11 +1,11 @@
 package com.chipIn.ChipIn.entities;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -19,12 +19,13 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@EqualsAndHashCode
 public class Expense {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "expenseid", columnDefinition = "uuid")
-    @JdbcTypeCode(SqlTypes.UUID)
     private UUID expenseId;
 
     @Column(name = "name")
@@ -42,11 +43,13 @@ public class Expense {
     @Column(name="paidby")
     private UUID paidBy;
 
-    @Column(name="groupid")
-    private UUID groupId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "groupid")
+    private Group group;
 
-    @Column(name = "currency_id")
-    private UUID currencyId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "currency_id", referencedColumnName = "id")
+    private Currency currency;
 
     @OneToMany(
             mappedBy = "expense",
@@ -54,6 +57,6 @@ public class Expense {
             fetch = FetchType.LAZY,
             orphanRemoval = true
     )
-    @JsonManagedReference
+    @JsonBackReference
     private List<Split> splits;
 }

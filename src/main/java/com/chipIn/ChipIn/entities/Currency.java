@@ -1,6 +1,8 @@
 package com.chipIn.ChipIn.entities;
 
 import com.chipIn.ChipIn.dto.CurrencyDto;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -14,6 +16,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "currency_exchange")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@EqualsAndHashCode
 public class Currency {
 
     @Id
@@ -35,6 +39,7 @@ public class Currency {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     @ToString.Exclude
+    @JsonIgnore
     private User createdBy;
 
     @Column(name = "created_on", nullable = false)

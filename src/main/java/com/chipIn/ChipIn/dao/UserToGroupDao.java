@@ -1,6 +1,7 @@
 package com.chipIn.ChipIn.dao;
 
 import com.chipIn.ChipIn.dto.UserToGroupDto;
+import com.chipIn.ChipIn.entities.Group;
 import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.entities.UserGroup;
 import com.chipIn.ChipIn.entities.UserGroupsId;
@@ -71,6 +72,21 @@ public class UserToGroupDao {
                     .collect(Collectors.toSet());
         }catch (Exception e){
             log.error("Error fetching GroupIds from UserId : {} ", userId);
+            throw new RuntimeException("Error while fetching groups", e);
+        }
+    }
+    public List<Group> getGroupsObjectByUserId(java.util.UUID userId){
+        try{
+            // select actual group rows and map them to the Group entity to avoid Object[] results
+            String sql = "SELECT g.* FROM chipin.groups g " +
+                    "JOIN chipin.user_groups ug ON g.groupid = ug.groupid " +
+                    "WHERE ug.userid = :userId";
+
+            return entityManager.createNativeQuery(sql, Group.class)
+                    .setParameter("userId", userId)
+                    .getResultList();
+        }catch (Exception e){
+            log.error("Error fetching Groups for UserId : {} ", userId, e);
             throw new RuntimeException("Error while fetching groups", e);
         }
     }

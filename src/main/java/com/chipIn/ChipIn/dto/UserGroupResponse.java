@@ -1,16 +1,18 @@
 package com.chipIn.ChipIn.dto;
 
 import com.chipIn.ChipIn.entities.Group;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
 @ToString
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserGroupResponse {
 
     private Group group;
-    private GroupExpenseDto groupExpense;
+    private List<GroupExpenseDto> groupExpense;
 
 }

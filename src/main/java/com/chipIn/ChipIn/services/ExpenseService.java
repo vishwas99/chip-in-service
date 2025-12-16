@@ -186,7 +186,7 @@ public class ExpenseService {
 
         // Get All splits for all expenses
 
-        List<Split> allUserSplits = splitsDao.getAllSplitsByExpenseIds(expenseIds);
+        List<Split> allUserSplits = splitsDao.getAllSplitsByExpenseIdsAndUserId(expenseIds, userId);
 
         log.info(allUserSplits.toString());
         // Map<UserId, Map<Currency, TotalOwed>>

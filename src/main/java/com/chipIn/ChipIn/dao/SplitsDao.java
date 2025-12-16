@@ -3,10 +3,7 @@ package com.chipIn.ChipIn.dao;
 import com.chipIn.ChipIn.entities.Split;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.*;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,5 +41,21 @@ public class SplitsDao {
 
         return entityManager.createQuery(cq).getResultList();
     }
+
+    public List<Split> getAllSplitsByExpenseIdsAndUserId(Set<UUID> expenseIds, UUID userId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Split> cq = cb.createQuery(Split.class);
+        Root<Split> root = cq.from(Split.class);
+
+        Join<Split, ?> expenseJoin = root.join("expense");
+
+        Predicate byExpenseIds = expenseJoin.get("expenseId").in(expenseIds);
+        Predicate byUserId = cb.equal(root.get("userId"), userId);
+
+        cq.select(root).where(cb.and(byExpenseIds, byUserId));
+
+        return entityManager.createQuery(cq).getResultList();
+    }
+
 
 }

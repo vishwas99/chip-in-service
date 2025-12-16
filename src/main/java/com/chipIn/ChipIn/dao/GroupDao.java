@@ -1,9 +1,8 @@
 package com.chipIn.ChipIn.dao;
 
-import com.chipIn.ChipIn.dto.GroupExpenseDto;
+import com.chipIn.ChipIn.dto.ExpenseResponseDto;
 import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.entities.Group;
-import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
@@ -68,11 +67,19 @@ public class GroupDao {
         for(Group group: groups){
             UserGroupResponse u = new UserGroupResponse();
             u.setGroup(group);
-            GroupExpenseDto groupExpenseDto = new GroupExpenseDto();
+            ExpenseResponseDto expenseResponseDto = new ExpenseResponseDto();
 //            groupExpenseDto.setCurrency();
 //            u.setMoneyOwed(userToGroupDao.getUserGroupMoneyOwed(userId, group.getGroupId()));
             userGroupResponses.add(u);
         }
         return userGroupResponses;
+    }
+
+    public List<Group> getAllGroupsByUserId(UUID userId){
+        Set<UUID> groupIds = userToGroupDao.getGroupsByUserId(userId);
+
+        List<UserGroupResponse> userGroupResponses = new ArrayList<>();
+
+        return getGroupSet(groupIds).stream().toList();
     }
 }

@@ -21,11 +21,13 @@ import java.util.UUID;
 @AllArgsConstructor
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @EqualsAndHashCode
+@ToString
 public class Expense {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "expenseid", columnDefinition = "uuid")
+    @EqualsAndHashCode.Include
     private UUID expenseId;
 
     @Column(name = "name")

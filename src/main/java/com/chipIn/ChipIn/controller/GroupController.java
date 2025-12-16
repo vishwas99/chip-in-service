@@ -32,7 +32,9 @@ public class GroupController extends BaseController {
 
     @PostMapping("/create")
     public ResponseEntity<ResponseWrapper<UUID>> createGroup(@RequestBody GroupDto groupDto) {
-        return ResponseEntity.ok(ResponseWrapper.success(groupService.createGroup(groupDto)));
+        UUID groupId = groupService.createGroup(groupDto);
+        groupService.addMemberToGroup(new UserToGroupDto(groupDto.getCreatedBy(), groupId));
+        return ResponseEntity.ok(ResponseWrapper.success(groupId));
     }
 
     @PostMapping("/addMember")

@@ -35,7 +35,7 @@ public class UserToGroupDao {
     public boolean addMemberToGroup(UserToGroupDto userToGroupDto){
         log.info("Adding member to group");
         try{
-            entityManager.createNativeQuery("INSERT INTO user_groups (groupid, userid) VALUES (:groupId, :userId)")
+            entityManager.createNativeQuery("INSERT INTO user_groups (groupid, userid, moneyowed) VALUES (:groupId, :userId, 0)")
                     .setParameter("groupId", userToGroupDto.getGroupId())
                     .setParameter("userId", userToGroupDto.getUserId())
                     .executeUpdate();

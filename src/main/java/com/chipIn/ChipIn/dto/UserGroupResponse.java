@@ -13,6 +13,6 @@ import java.util.List;
 public class UserGroupResponse {
 
     private Group group;
-    private List<GroupExpenseDto> groupExpense;
+    private List<ExpenseResponseDto> groupExpense;
 
 }

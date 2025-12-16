@@ -1,10 +1,8 @@
 package com.chipIn.ChipIn.services;
 
-import com.chipIn.ChipIn.dao.CurrencyExchangeDao;
-import com.chipIn.ChipIn.dao.ExpenseDao;
-import com.chipIn.ChipIn.dao.SplitsDao;
-import com.chipIn.ChipIn.dao.UserToGroupDao;
+import com.chipIn.ChipIn.dao.*;
 import com.chipIn.ChipIn.dto.*;
+import com.chipIn.ChipIn.dto.mapper.ExpenseMapper;
 import com.chipIn.ChipIn.entities.*;
 import com.chipIn.ChipIn.entities.Currency;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -32,6 +31,14 @@ public class ExpenseService {
     @Autowired
     private SplitsDao splitsDao;
 
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private ExpenseMapper expenseMapper;
+
+    @Autowired
+    private GroupDao groupDao;
 
     public void addExpense(ExpenseDto expenseDto){
         // Logic to add expense to the group
@@ -53,16 +60,16 @@ public class ExpenseService {
                 throw new RuntimeException("Invalid Users in Expense split found");
             }
             if(!expenseDto.getExpenseOwner().equals(splitDto.getUserId())){
-                splitDto.setAmount(splitDto.getAmount() * totalAmount * -1);
+                splitDto.setAmount(splitDto.getAmount() * -1);
             }else{
-                splitDto.setAmount(totalAmount - splitDto.getAmount() * totalAmount);
+                splitDto.setAmount(splitDto.getAmount());
             }
         }
 
         log.info("Expense List : {}", expenseDto.getExpenseSplit());
 
         // 3. Record expense in the group
-        expenseDao.addExpenseToGroup(expenseDto.toEntity());
+        expenseDao.addExpenseToGroup(expenseMapper.toEntity(expenseDto));
 
         // 4. Update user-group table's moneyOwed column
         updateMoneyOwed(expenseDto);
@@ -121,9 +128,9 @@ public class ExpenseService {
             }
 
             // Convert the Group Map to List<GroupExpenseDto>
-            List<GroupExpenseDto> groupExpenseList = new ArrayList<>();
+            List<ExpenseResponseDto> groupExpenseList = new ArrayList<>();
             for (Map.Entry<String, Float> entry : currentGroupMap.entrySet()) {
-                GroupExpenseDto dto = new GroupExpenseDto();
+                ExpenseResponseDto dto = new ExpenseResponseDto();
                 dto.setCurrency(entry.getKey());
                 dto.setMoneyOwed(entry.getValue());
                 groupExpenseList.add(dto);
@@ -138,9 +145,9 @@ public class ExpenseService {
         }
 
         // 4. Convert the Global Map to List<GroupExpenseDto>
-        List<GroupExpenseDto> globalMoneyOwedList = new ArrayList<>();
+        List<ExpenseResponseDto> globalMoneyOwedList = new ArrayList<>();
         for (Map.Entry<String, Float> entry : globalCurrencyMap.entrySet()) {
-            GroupExpenseDto dto = new GroupExpenseDto();
+            ExpenseResponseDto dto = new ExpenseResponseDto();
             dto.setCurrency(entry.getKey());
             dto.setMoneyOwed(entry.getValue());
             globalMoneyOwedList.add(dto);
@@ -155,6 +162,65 @@ public class ExpenseService {
 
     public List<Split> getExpensesByUserIdAndGroupId(UUID userId, UUID groupId){
         return expenseDao.getExpensesByUserIdAndGroupId(userId, groupId);
+    }
+
+    public UserSplitsDto getAllExpensesByUserIdGroupByUserId(UUID userId){
+        UserSplitsDto userSplitsDto = new UserSplitsDto();
+        userSplitsDto.setUser(userService.getUserById(userId));
+        List<UserSplitHelperDto> userSplitHelperDtoList = new ArrayList<>();
+        userSplitsDto.setExpenseList(userSplitHelperDtoList);
+
+        // Get All groups user is part of
+        List<Group> allUserGroups = groupDao.getAllGroupsByUserId(userId);
+        log.info("All User Group : " + allUserGroups.toString());
+        // Get All expenses for each group
+        List<Expense> allUserExpenses = new ArrayList<>();
+        for(Group curUserGroup: allUserGroups){
+            allUserExpenses.addAll(getExpensesByGroupId(curUserGroup.getGroupId()));
+        }
+        log.info(allUserExpenses.toString());
+        Set<UUID> expenseIds = allUserExpenses.stream()
+                .map(Expense::getExpenseId)
+                .collect(Collectors.toSet());
+        log.info(expenseIds.toString());
+
+        // Get All splits for all expenses
+
+        List<Split> allUserSplits = splitsDao.getAllSplitsByExpenseIds(expenseIds);
+
+        log.info(allUserSplits.toString());
+        // Map<UserId, Map<Currency, TotalOwed>>
+        Map<UUID, Map<Currency, Float>> userMoneyMap = new HashMap<>();
+
+        for (Split userSplit : allUserSplits) {
+            if (userSplit == null) continue;
+            UUID splitUserId = userSplit.getExpense().getPaidBy();
+            if (splitUserId == null) continue;
+
+            Expense expense = userSplit.getExpense();
+            if (expense == null || expense.getCurrency() == null) continue;
+
+            Currency curCurrency = expense.getCurrency();
+            Float curMoneyOwed = userSplit.getAmountOwed();
+            if (curMoneyOwed == null) continue;
+
+            Map<Currency, Float> curCurrencyMap = userMoneyMap.computeIfAbsent(splitUserId, k -> new HashMap<>());
+            curCurrencyMap.merge(curCurrency, curMoneyOwed, Float::sum);
+        }
+
+        for (Map.Entry<UUID, Map<Currency, Float>> entry : userMoneyMap.entrySet()) {
+            UUID curUserId = entry.getKey();
+            UserDto userDto = userService.getUserById(curUserId);
+            List<MoneyOwedDto> curMoneyOwedDtos = new ArrayList<>();
+
+            for (Map.Entry<Currency, Float> currencyEntry : entry.getValue().entrySet()) {
+                curMoneyOwedDtos.add(new MoneyOwedDto(currencyEntry.getValue(), currencyEntry.getKey()));
+            }
+
+            userSplitHelperDtoList.add(new UserSplitHelperDto(userDto, curMoneyOwedDtos));
+        }
+
+        return userSplitsDto;
     }
 
 

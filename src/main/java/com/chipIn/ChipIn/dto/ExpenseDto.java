@@ -38,25 +38,6 @@ public class ExpenseDto {
     @NotNull(message = "Currency is not provided")
     private UUID currencyId;
 
-    public Expense toEntity() {
-        Expense expense = new Expense();
-        expense.setName(this.expenseName);
-        expense.setPaidBy(this.expenseOwner);
-        expense.setAmount(this.amount);
-        expense.setDescription(this.description);
-//        expense.setGroupId(this.groupId);
-        expense.setDate(LocalDateTime.now());
-//        expense.setCurrencyId(this.currencyId);
-        List<Split> splits = new ArrayList<>();
-        for (SplitDto splitDto : this.expenseSplit) {
-            Split newSplit = splitDto.toEntity();
-            newSplit.setExpense(expense);
-            splits.add(newSplit);
-        }
-        expense.setSplits(splits);
-        return expense;
-    }
-
     @Override
     public String toString() {
         return "ExpenseDto{" +

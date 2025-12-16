@@ -21,6 +21,7 @@ public class Group {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "groupid")
+    @EqualsAndHashCode.Include
     private UUID groupId;
 
     @Column(name = "name")

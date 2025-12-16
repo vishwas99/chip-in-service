@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,7 @@ public class GroupService {
 
 
     public UUID createGroup(@RequestBody GroupDto groupDto){
+        groupDto.setCreatedAt(LocalDateTime.now());
         return groupDao.createGroup(groupDto.toEntity());
     }
 

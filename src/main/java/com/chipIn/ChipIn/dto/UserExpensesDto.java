@@ -12,7 +12,7 @@ import java.util.UUID;
 @ToString
 public class UserExpensesDto {
     private UUID userId;
-    private List<GroupExpenseDto> moneyOwedList;
+    private List<ExpenseResponseDto> moneyOwedList;
     private List<UserGroupResponse> userGroupResponses;
 
 }

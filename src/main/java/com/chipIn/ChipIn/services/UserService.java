@@ -65,4 +65,10 @@ public class UserService implements UserDetailsService {
         );
     }
 
+    public List<UserDto> getUsersByUserIds(List<UUID> userIds){
+        return userDao.getUsersByIds(userIds).stream()
+                .map(UserDto::new)
+                .toList();
+    }
+
 }

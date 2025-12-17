@@ -6,11 +6,10 @@ import com.chipIn.ChipIn.dao.UserDao;
 import com.chipIn.ChipIn.dto.ExpenseDto;
 import com.chipIn.ChipIn.dto.SplitDto;
 import com.chipIn.ChipIn.entities.Expense;
-import com.chipIn.ChipIn.entities.Group;
 import com.chipIn.ChipIn.entities.Split;
+import com.chipIn.ChipIn.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,18 +21,20 @@ public class ExpenseMapper {
     private final UserDao userDao;
     private final CurrencyExchangeDao currencyExchangeDao;
     private final GroupDao groupDao;
+    private final UserService userService;
 
     @Autowired
-    public ExpenseMapper(UserDao userDao, CurrencyExchangeDao currencyExchangeDao, GroupDao groupDao) {
+    public ExpenseMapper(UserDao userDao, CurrencyExchangeDao currencyExchangeDao, GroupDao groupDao, UserService userService) {
         this.userDao = userDao;
         this.currencyExchangeDao = currencyExchangeDao;
         this.groupDao = groupDao;
+        this.userService = userService;
     }
 
     public Expense toEntity(ExpenseDto expenseDto){
         Expense expense = new Expense();
         expense.setName(expenseDto.getExpenseName());
-        expense.setPaidBy(expenseDto.getExpenseOwner());
+        expense.setPaidBy(userDao.getUserById(expenseDto.getExpenseOwner()));
         expense.setAmount(expenseDto.getAmount());
         expense.setDescription(expenseDto.getDescription());
         expense.setGroup(groupDao.getGroupData(expenseDto.getGroupId()));

@@ -32,17 +32,18 @@ public class ExpenseDao {
 
         root.fetch("splits", JoinType.LEFT);
 
-        // FIX 1: "groupId" field no longer exists in Expense. It is now "group".
-        // We join to the group to filter by its ID.
         Join<Expense, Group> groupJoin = root.join("group", JoinType.INNER);
 
-        // Assuming Group entity has a field "groupId". If it's "id", change below to "id".
         cq.select(root)
                 .where(cb.equal(groupJoin.get("groupId"), groupId))
                 .distinct(true);
 
         return entityManager.createQuery(cq).getResultList();
     }
+
+//    public List<Expense> getExpenseObjectByGroupId(UUID groupId){
+//
+//    }
 
     public List<Expense> getExpensesByUserId(UUID userId){
         CriteriaBuilder cb = entityManager.getCriteriaBuilder(); // Renamed for consistency

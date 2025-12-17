@@ -42,8 +42,9 @@ public class Expense {
     @Column(name = "created_at")
     private LocalDateTime date;
 
-    @Column(name="paidby")
-    private UUID paidBy;
+    @JoinColumn(name="paidby")
+    @ManyToOne(fetch = FetchType.LAZY)
+    private User paidBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupid")

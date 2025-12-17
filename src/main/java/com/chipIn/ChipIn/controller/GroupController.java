@@ -4,6 +4,7 @@ import com.chipIn.ChipIn.dto.ExpenseDto;
 import com.chipIn.ChipIn.dto.GroupDto;
 import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.dto.UserToGroupDto;
+import com.chipIn.ChipIn.entities.Expense;
 import com.chipIn.ChipIn.entities.Group;
 import com.chipIn.ChipIn.services.ExpenseService;
 import com.chipIn.ChipIn.services.GroupService;
@@ -62,6 +63,11 @@ public class GroupController extends BaseController {
     @GetMapping("/users")
     public ResponseEntity<ResponseWrapper<List<UserGroupResponse>>> getGroupsByUserId(@RequestParam("userId") UUID userId) {
         return ResponseEntity.ok(ResponseWrapper.success(groupService.getGroupsByUserId(userId)));
+    }
+
+    @GetMapping("/expense")
+    public ResponseEntity<ResponseWrapper<List<Expense>>> getGroupsByGroupId(@RequestParam("groupId") UUID groupId) {
+        return ResponseEntity.ok(ResponseWrapper.success(expenseService.getExpensesByGroupId(groupId)));
     }
 
 }

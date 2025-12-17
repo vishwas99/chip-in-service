@@ -5,6 +5,7 @@ import com.chipIn.ChipIn.dao.UserToGroupDao;
 import com.chipIn.ChipIn.dto.GroupDto;
 import com.chipIn.ChipIn.dto.UserGroupResponse;
 import com.chipIn.ChipIn.dto.UserToGroupDto;
+import com.chipIn.ChipIn.entities.Expense;
 import com.chipIn.ChipIn.entities.Group;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

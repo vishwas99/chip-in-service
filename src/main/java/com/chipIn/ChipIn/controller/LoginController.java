@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 //@RequestMapping()
@@ -57,7 +58,28 @@ public class LoginController extends BaseController {
         HttpSession session = request.getSession(); // Create or retrieve session
         session.setAttribute("USER", auth.getPrincipal()); // Store user details in session
 
-        return ResponseEntity.ok(Map.of("message", "Login successful", "sessionId", session.getId()));
+        UUID userId = null;
+        String email = credentials.get("email");
+        Object principal = auth.getPrincipal();
+        if (principal instanceof com.chipIn.ChipIn.entities.User) {
+            userId = ((com.chipIn.ChipIn.entities.User) principal).getUserId();
+        } else if (email != null) {
+            var optUser = userDao.getUserByEmail(email);
+            if (optUser.isPresent()) {
+                userId = optUser.get().getUserId();
+            }
+        }
+
+        if (userId != null) {
+            session.setAttribute("USER_ID", userId);
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Login successful",
+                "sessionId", session.getId(),
+                "userId", userId,
+                "user", auth.getPrincipal()
+        ));
     }
 
     @PostMapping("/register")

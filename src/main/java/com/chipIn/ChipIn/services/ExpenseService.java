@@ -165,6 +165,10 @@ public class ExpenseService {
     }
 
     public UserSplitsDto getAllExpensesByUserIdGroupByUserId(UUID userId){
+
+        log.info("All splits for user : {}", userId);
+
+        // Creating Response Object
         UserSplitsDto userSplitsDto = new UserSplitsDto();
         userSplitsDto.setUser(userService.getUserById(userId));
         List<UserSplitHelperDto> userSplitHelperDtoList = new ArrayList<>();
@@ -173,41 +177,58 @@ public class ExpenseService {
         // Get All groups user is part of
         List<Group> allUserGroups = groupDao.getAllGroupsByUserId(userId);
         log.info("All User Group : " + allUserGroups.toString());
-        // Get All expenses for each group
+        // Get All expenses for each group user is part of
         List<Expense> allUserExpenses = new ArrayList<>();
         for(Group curUserGroup: allUserGroups){
             allUserExpenses.addAll(getExpensesByGroupId(curUserGroup.getGroupId()));
         }
         log.info(allUserExpenses.toString());
+        // Get ExpenseId - All expenseIds of the groups user is part of
         Set<UUID> expenseIds = allUserExpenses.stream()
                 .map(Expense::getExpenseId)
                 .collect(Collectors.toSet());
         log.info(expenseIds.toString());
 
-        // Get All splits for all expenses
+        // Get All splits for all expensesIds
+        List<Split> allUserSplits = splitsDao.getAllSplitsByExpenseIds(expenseIds);
 
-        List<Split> allUserSplits = splitsDao.getAllSplitsByExpenseIdsAndUserId(expenseIds, userId);
-
-        log.info(allUserSplits.toString());
-        // Map<UserId, Map<Currency, TotalOwed>>
+        // Map of UserId - Map of Currency - MoneyOwed
         Map<UUID, Map<Currency, Float>> userMoneyMap = new HashMap<>();
 
         for (Split userSplit : allUserSplits) {
             if (userSplit == null) continue;
-            UUID splitUserId = userSplit.getExpense().getPaidBy();
-            if (splitUserId == null) continue;
 
             Expense expense = userSplit.getExpense();
             if (expense == null || expense.getCurrency() == null) continue;
 
-            Currency curCurrency = expense.getCurrency();
+            UUID paidByUserId = expense.getPaidBy().getUserId();
+            if (paidByUserId == null) continue;
+
+            UUID splitUserId = userSplit.getUserId(); // or getUserId()
             Float curMoneyOwed = userSplit.getAmountOwed();
             if (curMoneyOwed == null) continue;
 
-            Map<Currency, Float> curCurrencyMap = userMoneyMap.computeIfAbsent(splitUserId, k -> new HashMap<>());
-            curCurrencyMap.merge(curCurrency, curMoneyOwed, Float::sum);
+            Currency curCurrency = expense.getCurrency();
+
+            // money from targetUser → payer
+            if (splitUserId.equals(userId)) {
+                Map<Currency, Float> curCurrencyMap =
+                        userMoneyMap.computeIfAbsent(paidByUserId, k -> new HashMap<>());
+                curCurrencyMap.merge(curCurrency, curMoneyOwed, Float::sum);
+            }
+
+            // money from others → targetUser (targetUser is payer)
+            if (paidByUserId.equals(userId) && !splitUserId.equals(userId)) {
+                Map<Currency, Float> curCurrencyMap =
+                        userMoneyMap.computeIfAbsent(splitUserId, k -> new HashMap<>());
+                curCurrencyMap.merge(curCurrency, -curMoneyOwed, Float::sum);
+            }
         }
 
+        // Remove Current User's data from userMoneyMap
+        userMoneyMap.remove(userId);
+
+        // Creating Response
         for (Map.Entry<UUID, Map<Currency, Float>> entry : userMoneyMap.entrySet()) {
             UUID curUserId = entry.getKey();
             UserDto userDto = userService.getUserById(curUserId);
@@ -222,7 +243,5 @@ public class ExpenseService {
 
         return userSplitsDto;
     }
-
-
 
 }

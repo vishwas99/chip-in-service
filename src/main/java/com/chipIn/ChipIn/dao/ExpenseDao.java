@@ -84,4 +84,30 @@ public class ExpenseDao {
 
         return entityManager.createQuery(cq).getResultList();
     }
+
+    public List<Split> getSplitsByGroupId(UUID groupId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Split> cq = cb.createQuery(Split.class);
+
+        Root<Split> split = cq.from(Split.class);
+
+        // Fetch expense and currency
+        Fetch<Split, Expense> expenseFetch = split.fetch("expense", JoinType.INNER);
+        expenseFetch.fetch("currency", JoinType.LEFT);
+
+        // Cast to Join for filtering
+        Join<Split, Expense> expenseJoin = (Join<Split, Expense>) expenseFetch;
+
+        // FIX 3: Ensure we join on "group" (the entity field name), not "groupId"
+        Join<Expense, Group> groupJoin = expenseJoin.join("group", JoinType.INNER);
+
+        cq.select(split)
+                .where(
+                        cb.and(
+                                cb.equal(groupJoin.get("groupId"), groupId)
+                        )
+                );
+
+        return entityManager.createQuery(cq).getResultList();
+    }
 }

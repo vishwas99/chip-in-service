@@ -28,16 +28,16 @@ public class Split {
     @EqualsAndHashCode.Include
     private UUID splitId;
 
-    @JdbcTypeCode(SqlTypes.UUID)
-    @Column(name="userid", columnDefinition = "uuid")
-    private UUID userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "userid", referencedColumnName = "userid") // change referencedColumnName to your User PK column name
+    private User user;
 
     @Column(name="amountowed")
     private Float amountOwed;
 
     @ManyToOne
     @JoinColumn(name = "expenseid", nullable = false)
-    @JsonManagedReference
+    @JsonBackReference
     @ToString.Exclude
     private Expense expense;
 

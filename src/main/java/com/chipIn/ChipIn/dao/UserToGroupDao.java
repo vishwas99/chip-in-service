@@ -124,5 +124,21 @@ public class UserToGroupDao {
         }
     }
 
+    // Get UserId based on GroupId and Join with User Table based on userId
+    public List<User> getUsersInGroup(UUID groupId){
+        try{
+            String sql = "SELECT u.* FROM chipin.users u " +
+                    "JOIN chipin.user_groups ug ON u.userid = ug.userid " +
+                    "WHERE ug.groupid = :groupId";
+
+            return entityManager.createNativeQuery(sql, User.class)
+                    .setParameter("groupId", groupId)
+                    .getResultList();
+        }catch (Exception e){
+            log.error("Error fetching Users for GroupId : {} ", groupId, e);
+            throw new RuntimeException("Error while fetching users", e);
+        }
+    }
+
 
 }

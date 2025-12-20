@@ -11,11 +11,4 @@ public class SplitDto {
     private UUID userId;
     private Float amount;
 
-    public Split toEntity() {
-        Split split = new Split();
-        split.setUserId(this.userId);
-        split.setAmountOwed(this.amount);
-        return split;
-    }
-
 }

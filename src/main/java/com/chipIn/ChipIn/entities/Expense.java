@@ -60,6 +60,6 @@ public class Expense {
             fetch = FetchType.LAZY,
             orphanRemoval = true
     )
-    @JsonBackReference
+    @JsonManagedReference
     private List<Split> splits;
 }

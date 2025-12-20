@@ -43,6 +43,8 @@ public class ExpenseService {
     public void addExpense(ExpenseDto expenseDto){
         // Logic to add expense to the group
 
+        log.info("Adding Expense to Group : {}", expenseDto.toString());
+
         // 1. Validate all users in split
         Set<UUID> groupMembers = groupService.getUserByGroupId(expenseDto.getGroupId());
 
@@ -57,6 +59,7 @@ public class ExpenseService {
         Float totalAmount = expenseDto.getAmount();
         for(SplitDto splitDto : expenseDto.getExpenseSplit()){
             if(!groupMembers.contains(splitDto.getUserId())){
+                log.error("Invalid User in Expense Split : {} : in group : {} ", splitDto.getUserId(), expenseDto.getGroupId());
                 throw new RuntimeException("Invalid Users in Expense split found");
             }
             if(!expenseDto.getExpenseOwner().equals(splitDto.getUserId())){
@@ -117,7 +120,7 @@ public class ExpenseService {
                 if (amount == null) continue;
 
                 UUID paidBy = expense.getPaidBy().getUserId();
-                UUID participant = split.getUserId(); // or split.getUser().getUserId()
+                UUID participant = split.getUser().getUserId(); // or split.getUser().getUserId()
 
                 // 1) This user's own splits ONLY when someone else paid
                 if (participant.equals(userId) && !paidBy.equals(userId)) {
@@ -163,6 +166,8 @@ public class ExpenseService {
 
         return userExpensesDto;
     }
+
+
     public List<Split> getExpensesByUserIdAndGroupId(UUID userId, UUID groupId){
         return expenseDao.getExpensesByUserIdAndGroupId(userId, groupId);
     }
@@ -234,7 +239,7 @@ public class ExpenseService {
                 continue;
             }
 
-            UUID splitUserId = userSplit.getUserId();
+            UUID splitUserId = userSplit.getUser().getUserId();
             Float curMoneyOwed = userSplit.getAmountOwed();
             if (curMoneyOwed == null) {
                 log.warn("Split #{} user {} - amountOwed is NULL - skipping",
@@ -307,5 +312,8 @@ public class ExpenseService {
         return userSplitsDto;
     }
 
+    public ExpenseDetailsDto getExpenseById(UUID expenseId){
+        return new ExpenseDetailsDto(expenseDao.getExpenseById(expenseId), splitsDao.getSplitsWithUserDataByExpenseId(expenseId));
+    }
 
 }

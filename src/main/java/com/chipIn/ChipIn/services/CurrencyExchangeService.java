@@ -7,6 +7,7 @@ import com.chipIn.ChipIn.entities.Currency;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -39,6 +40,10 @@ public class CurrencyExchangeService {
 
         return currencyExchangeDao.createCurrency(currencyMapper.toEntity(currencyDto));
 
+    }
+
+    public List<Currency> getAllCurrencies(UUID userId){
+        return currencyExchangeDao.getAllCurrencies(userId);
     }
 
 }

@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.controller;
 
+import com.chipIn.ChipIn.dto.ExpenseDetailsDto;
 import com.chipIn.ChipIn.dto.UserExpensesDto;
 import com.chipIn.ChipIn.dto.UserSplitsDto;
 import com.chipIn.ChipIn.entities.Expense;
@@ -41,5 +42,10 @@ public class ExpenseController {
     @GetMapping("/user-user")
     public ResponseEntity<ResponseWrapper<UserSplitsDto>> getAllUserToUserSplits(@RequestParam UUID userId) throws InterruptedException {
         return ResponseEntity.ok(ResponseWrapper.success(expenseService.getAllExpensesByUserIdGroupByUserId(userId)));
+    }
+
+    @GetMapping("/details")
+    public ResponseEntity<ResponseWrapper<ExpenseDetailsDto>> getExpenseById(@RequestParam UUID expenseId) throws InterruptedException {
+        return ResponseEntity.ok(ResponseWrapper.success(expenseService.getExpenseById(expenseId)));
     }
 }

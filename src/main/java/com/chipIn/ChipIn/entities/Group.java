@@ -30,8 +30,9 @@ public class Group {
     @Column(name = "description")
     private String groupDescription;
 
-    @Column(name = "created_by")
-    private UUID groupAdmin;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", referencedColumnName = "userid")
+    private User groupAdmin;
 
     @Column(name = "created_at")
     private LocalDateTime groupCreationDate;

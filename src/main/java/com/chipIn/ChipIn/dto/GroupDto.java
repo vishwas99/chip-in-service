@@ -30,13 +30,13 @@ public class GroupDto {
         this.createdAt = LocalDateTime.now();
     }
 
-    public Group toEntity() {
-        Group group = new Group();
-        group.setGroupName(this.groupName);
-        group.setGroupDescription(this.groupDescription);
-        group.setGroupAdmin(this.createdBy);
-        group.setGroupCreationDate(this.createdAt);
-        return group;
-    }
+//    public Group toEntity() {
+//        Group group = new Group();
+//        group.setGroupName(this.groupName);
+//        group.setGroupDescription(this.groupDescription);
+//        group.setGroupAdmin(this.createdBy);
+//        group.setGroupCreationDate(this.createdAt);
+//        return group;
+//    }
 
 }

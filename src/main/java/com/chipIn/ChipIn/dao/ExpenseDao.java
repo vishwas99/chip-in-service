@@ -6,12 +6,14 @@ import com.chipIn.ChipIn.entities.Split;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Repository
 @Transactional
 public class ExpenseDao {
@@ -21,6 +23,7 @@ public class ExpenseDao {
 
     @Transactional
     public void addExpenseToGroup(Expense expense){
+        log.info("Saving expense: " + expense.toString());
         entityManager.persist(expense);
         entityManager.flush();
     }
@@ -41,9 +44,21 @@ public class ExpenseDao {
         return entityManager.createQuery(cq).getResultList();
     }
 
-//    public List<Expense> getExpenseObjectByGroupId(UUID groupId){
-//
-//    }
+    public Expense getExpenseById(UUID expenseId){
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Expense> cq = cb.createQuery(Expense.class);
+        Root<Expense> root = cq.from(Expense.class);
+
+        root.fetch("splits", JoinType.LEFT);     // collection
+        root.fetch("paidBy", JoinType.LEFT);     // optional, if mapping to DTO needs it
+        root.fetch("currency", JoinType.LEFT);
+
+        cq.select(root)
+                .where(cb.equal(root.get("expenseId"), expenseId))
+                .distinct(true);
+
+        return entityManager.createQuery(cq).getSingleResult();
+    }
 
     public List<Expense> getExpensesByUserId(UUID userId){
         CriteriaBuilder cb = entityManager.getCriteriaBuilder(); // Renamed for consistency

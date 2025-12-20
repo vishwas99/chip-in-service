@@ -22,13 +22,15 @@ public class ExpenseMapper {
     private final CurrencyExchangeDao currencyExchangeDao;
     private final GroupDao groupDao;
     private final UserService userService;
+    private final SplitMapper splitMapper;
 
     @Autowired
-    public ExpenseMapper(UserDao userDao, CurrencyExchangeDao currencyExchangeDao, GroupDao groupDao, UserService userService) {
+    public ExpenseMapper(UserDao userDao, CurrencyExchangeDao currencyExchangeDao, GroupDao groupDao, UserService userService, SplitMapper splitMapper) {
         this.userDao = userDao;
         this.currencyExchangeDao = currencyExchangeDao;
         this.groupDao = groupDao;
         this.userService = userService;
+        this.splitMapper = splitMapper;
     }
 
     public Expense toEntity(ExpenseDto expenseDto){
@@ -42,7 +44,7 @@ public class ExpenseMapper {
         expense.setCurrency(currencyExchangeDao.getCurrency(expenseDto.getCurrencyId()));
         List<Split> splits = new ArrayList<>();
         for (SplitDto splitDto : expenseDto.getExpenseSplit()) {
-            Split newSplit = splitDto.toEntity();
+            Split newSplit = splitMapper.toEntity(splitDto);
             newSplit.setExpense(expense);
             splits.add(newSplit);
         }

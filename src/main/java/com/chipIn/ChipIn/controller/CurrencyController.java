@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -29,6 +30,11 @@ public class CurrencyController extends BaseController {
     @PostMapping("/createCurrency")
     public ResponseEntity<ResponseWrapper<Currency>> createCurrency(@RequestBody CurrencyDto currencyDto){
         return ResponseEntity.ok(ResponseWrapper.success(currencyExchangeService.createCurrency(currencyDto)));
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<ResponseWrapper<List<Currency>>> getAllCurrencies(@RequestParam UUID userId){
+        return ResponseEntity.ok(ResponseWrapper.success(currencyExchangeService.getAllCurrencies(userId)));
     }
 
 }

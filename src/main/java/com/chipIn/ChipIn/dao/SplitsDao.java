@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.dao;
 
+import com.chipIn.ChipIn.entities.Expense;
 import com.chipIn.ChipIn.entities.Split;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -57,5 +58,22 @@ public class SplitsDao {
         return entityManager.createQuery(cq).getResultList();
     }
 
+    public List<Split> getSplitsWithUserDataByExpenseId(UUID expenseId) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Split> cq = cb.createQuery(Split.class);
+        Root<Split> root = cq.from(Split.class);
+
+        // fetch user data
+        root.fetch("user", JoinType.LEFT);
+
+        // join expense for filtering
+        Join<Split, Expense> expenseJoin = root.join("expense", JoinType.INNER);
+
+        cq.select(root)
+                .where(cb.equal(expenseJoin.get("expenseId"), expenseId))
+                .distinct(true);
+
+        return entityManager.createQuery(cq).getResultList();
+    }
 
 }

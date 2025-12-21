@@ -17,7 +17,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Table(name = "currency_exchange")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Currency {
 
     @Id

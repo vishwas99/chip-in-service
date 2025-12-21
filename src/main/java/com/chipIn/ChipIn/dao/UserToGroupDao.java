@@ -35,7 +35,7 @@ public class UserToGroupDao {
     public boolean addMemberToGroup(UserToGroupDto userToGroupDto){
         log.info("Adding member to group");
         try{
-            entityManager.createNativeQuery("INSERT INTO user_groups (groupid, userid, moneyowed) VALUES (:groupId, :userId, 0)")
+            entityManager.createNativeQuery("INSERT INTO chipin.user_groups (groupid, userid, moneyowed) VALUES (:groupId, :userId, 0)")
                     .setParameter("groupId", userToGroupDto.getGroupId())
                     .setParameter("userId", userToGroupDto.getUserId())
                     .executeUpdate();
@@ -64,7 +64,7 @@ public class UserToGroupDao {
 
     public Set<UUID> getGroupsByUserId(UUID userId){
         try{
-            String sql = "SELECT groupid FROM user_groups WHERE userid=:userId";
+            String sql = "SELECT groupid FROM chipin.user_groups WHERE userid=:userId";
             return (Set<UUID>) entityManager.createNativeQuery(sql)
                     .setParameter("userId", userId)
                     .getResultStream()

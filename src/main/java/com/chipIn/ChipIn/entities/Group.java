@@ -15,7 +15,7 @@ import java.util.UUID;
 @Setter
 @ToString
 @RequiredArgsConstructor
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Group {
     @Id

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -47,5 +48,21 @@ public class UserController extends BaseController {
         return ResponseEntity.ok(ResponseWrapper.success(userService.getUserById(userId)));
     }
 
+
+    @GetMapping("/get-known-users")
+    public ResponseEntity<ResponseWrapper<Set<User>>> getKnownUsers(@RequestParam("userId") UUID userId){
+        return ResponseEntity.ok(ResponseWrapper.success(userService.getKnownUsers(userId)));
+    }
+
+
+    @GetMapping("/get-new-known-users")
+    public ResponseEntity<ResponseWrapper<Set<User>>> getKnownUsers(@RequestParam("userId") UUID userId, @RequestParam("groupId") UUID groupId){
+        return ResponseEntity.ok(ResponseWrapper.success(userService.getKnownUsersByGroup(userId, groupId)));
+    }
+
+    @GetMapping("/get-user-by-email")
+    public ResponseEntity<ResponseWrapper<User>> getUserByEmail(@RequestParam("email") String emailId) {
+        return ResponseEntity.ok(ResponseWrapper.success(userService.getUserByEmail(emailId)));
+    }
 
 }

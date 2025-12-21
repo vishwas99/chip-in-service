@@ -16,11 +16,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Table(name = "users", schema = "chipin")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "userid", nullable = false, updatable = false)
+    @EqualsAndHashCode.Include
     private UUID userId;
 
     @Column(name = "name", nullable = false, length = 100)
@@ -39,4 +41,7 @@ public class User {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
+    public User(UUID userId){
+       this.userId = userId;
+    }
 }

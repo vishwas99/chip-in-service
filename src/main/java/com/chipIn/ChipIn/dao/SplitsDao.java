@@ -24,7 +24,7 @@ public class SplitsDao {
         CriteriaQuery<Split> criteriaQuery = criteriaBuilder.createQuery(Split.class);
         Root<Split> root = criteriaQuery.from(Split.class);
 
-        criteriaQuery.select(root).where(criteriaBuilder.equal(root.get("userId"), userId));
+        criteriaQuery.select(root).where(criteriaBuilder.equal(root.get("user").get("userId"), userId));
 
         return entityManager.createQuery(criteriaQuery).getResultList();
 

@@ -1,68 +1,28 @@
 package com.chipIn.ChipIn.controller;
-
-import com.chipIn.ChipIn.dto.GroupDto;
-import com.chipIn.ChipIn.dto.UserDto;
-import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.services.UserService;
-import com.chipIn.ChipIn.util.ErrorResponse;
-import com.chipIn.ChipIn.util.ResponseWrapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-//import com.ey.springboot3security.service.JwtService;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/users")
 @Validated
+@RequiredArgsConstructor
 public class UserController extends BaseController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
-//    @Autowired
-//    private UserInfoService service;
-//
-//    @Autowired
-//    private JwtService jwtService;
-
-    @GetMapping("/list")
-    public ResponseEntity<ResponseWrapper<List<User>>> getUsers(){
-        return ResponseEntity.ok(ResponseWrapper.success(userService.getUsers()));
+    @PostMapping("/disable")
+    public ResponseEntity<String> disableUser(@RequestParam String email) {
+        userService.disableUser(email);
+        return ResponseEntity.ok("User disabled successfully.");
     }
 
-    @PostMapping("/add")
-    public ResponseEntity<ResponseWrapper<UUID>> addUser(@RequestBody UserDto userData){
-        userData.setCreatedAt(LocalDateTime.now());
-        return ResponseEntity.ok(ResponseWrapper.success(userService.addUser(userData.toEntity())));
+    @PostMapping("/enable")
+    public ResponseEntity<String> enableUser(@RequestParam String email) {
+        userService.enableUser(email);
+        return ResponseEntity.ok("User enabled successfully.");
     }
-
-    @GetMapping("/getUserById")
-    public ResponseEntity<ResponseWrapper<UserDto>> getUserById(@RequestParam("id") UUID userId){
-        return ResponseEntity.ok(ResponseWrapper.success(userService.getUserById(userId)));
-    }
-
-
-    @GetMapping("/get-known-users")
-    public ResponseEntity<ResponseWrapper<Set<User>>> getKnownUsers(@RequestParam("userId") UUID userId){
-        return ResponseEntity.ok(ResponseWrapper.success(userService.getKnownUsers(userId)));
-    }
-
-
-    @GetMapping("/get-new-known-users")
-    public ResponseEntity<ResponseWrapper<Set<User>>> getKnownUsers(@RequestParam("userId") UUID userId, @RequestParam("groupId") UUID groupId){
-        return ResponseEntity.ok(ResponseWrapper.success(userService.getKnownUsersByGroup(userId, groupId)));
-    }
-
-    @GetMapping("/get-user-by-email")
-    public ResponseEntity<ResponseWrapper<User>> getUserByEmail(@RequestParam("email") String emailId) {
-        return ResponseEntity.ok(ResponseWrapper.success(userService.getUserByEmail(emailId)));
-    }
-
 }

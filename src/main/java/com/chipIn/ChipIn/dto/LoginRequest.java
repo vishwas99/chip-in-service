@@ -1,6 +1,5 @@
 package com.chipIn.ChipIn.dto;
 
-import com.chipIn.ChipIn.entities.Currency;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,7 +9,9 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class MoneyOwedDto {
-    public Float moneyOwed;
-    public Currency currency;
+public class LoginRequest {
+
+    String email;
+    String password;
+
 }

@@ -34,6 +34,12 @@ public class GroupService {
         // 1. Validate & Set the Master Currency FIRST
         Currency masterCurrency = currencyRepository.findById(groupData.getDefaultCurrency().getCurrencyId())
                 .orElseThrow(() -> new RuntimeException("Master Currency not found"));
+                
+        // 🚨 Verify if the currency is valid (active and is a global currency)
+        if (!masterCurrency.isActive() || masterCurrency.getGroup() != null) {
+            throw new IllegalArgumentException("Invalid currency. Only active global currencies can be set as default for a new group.");
+        }
+        
         groupData.setDefaultCurrency(masterCurrency);
         groupData.setCreatedBy(creator.getUserid());
 
@@ -101,6 +107,33 @@ public class GroupService {
 
         // 6. Save
         groupMemberRepository.save(newMembership);
+    }
+    
+    @Transactional
+    public GroupCurrency addGroupCurrency(UUID groupId, UUID currencyId, String name, BigDecimal exchangeRate, User currentUser) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+                
+        Currency currency = currencyRepository.findById(currencyId)
+                .orElseThrow(() -> new RuntimeException("Currency not found"));
+                
+        // 🚨 Verify if the currency is valid for this group (global or specific to this group)
+        if (!currency.isActive()) {
+            throw new IllegalArgumentException("Currency is not active.");
+        }
+        if (currency.getGroup() != null && !currency.getGroup().getGroupId().equals(groupId)) {
+            throw new IllegalArgumentException("This custom currency does not belong to this group.");
+        }
+        
+        GroupCurrency groupCurrency = GroupCurrency.builder()
+                .group(group)
+                .masterCurrency(currency)
+                .name(name)
+                .exchangeRate(exchangeRate)
+                .createdBy(currentUser)
+                .build();
+                
+        return groupCurrencyRepository.save(groupCurrency);
     }
 
     public GroupDashboardResponse getGroupDashboard(UUID groupId, UUID currentUserId) {
@@ -181,6 +214,7 @@ public class GroupService {
         return GroupDashboardResponse.builder()
                 .groupId(group.getGroupId())
                 .groupName(group.getName())
+                .targetCurrencyId(group.getDefaultCurrency().getCurrencyId())
                 .currencyCode(group.getDefaultCurrency().getCode())
                 .userBalances(userBalanceDtos)
                 .expenses(expenseSummaries)

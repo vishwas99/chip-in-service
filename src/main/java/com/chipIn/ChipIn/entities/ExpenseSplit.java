@@ -40,4 +40,9 @@ public class ExpenseSplit {
     // Used for non-EQUAL splits (e.g., 20%, 3 shares, etc.)
     @Column(name = "raw_value", precision = 19, scale = 4)
     private BigDecimal rawValue;
+
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    private Long version = 0L;
 }

@@ -32,7 +32,7 @@ public class Currency {
     @NotBlank(message = "Currency code cannot be blank")
     @Size(min = 3, max = 3, message = "Currency code must be 3 characters long (ISO 4217)")
     @Pattern(regexp = "[A-Z]{3}", message = "Currency code must consist of 3 uppercase letters")
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String code; // e.g., "INR", "USD", "JPY"
 
     @NotBlank(message = "Currency name cannot be blank")
@@ -44,4 +44,17 @@ public class Currency {
     @Size(max = 10, message = "Currency symbol cannot exceed 10 characters")
     @Column(nullable = false)
     private String symbol; // e.g., "₹", "$", "¥"
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "groupid")
+    private Group group; // null means it's a global/fixed currency
+
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private boolean isActive = true;
+
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    private Long version = 0L;
 }

@@ -36,4 +36,9 @@ public class ExpensePayer {
     // How much this specific user paid (in the custom currency)
     @Column(name = "paid_amount", nullable = false, precision = 19, scale = 4)
     private BigDecimal paidAmount;
+
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    private Long version = 0L;
 }

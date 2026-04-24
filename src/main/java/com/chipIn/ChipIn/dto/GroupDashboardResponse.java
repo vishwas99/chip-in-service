@@ -13,7 +13,8 @@ public class GroupDashboardResponse {
     // 1. Group Meta Data
     private UUID groupId;
     private String groupName;
-    private String currencyCode; // The Group's Master Currency (e.g. INR)
+    private UUID targetCurrencyId; // Added targetCurrencyId (e.g. INR ID)
+    private String currencyCode; // Optional: Keep for display purposes if needed
 
     // 2. The Totals (Who owes what in Total)
     private List<UserBalanceDto> userBalances;

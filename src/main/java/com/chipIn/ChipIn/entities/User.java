@@ -80,6 +80,11 @@ public class User implements UserDetails {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    private Long version = 0L;
+
     // --- UserDetails Implementation (For Spring Security) ---
 
     @Override

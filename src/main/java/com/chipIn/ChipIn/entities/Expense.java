@@ -88,4 +88,9 @@ public class Expense {
     @ToString.Exclude
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ExpenseSplit> splits;
+
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    private Long version = 0L;
 }

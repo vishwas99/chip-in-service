@@ -33,6 +33,7 @@ public class SecurityConfig {
             // PROD MODE: Secure everything
             http.authorizeHttpRequests(auth -> auth
                             .requestMatchers("/auth/**").permitAll()
+                            .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll() // Whitelist Swagger
                             .requestMatchers("/api/**").authenticated()
                             .anyRequest().denyAll()
                     )

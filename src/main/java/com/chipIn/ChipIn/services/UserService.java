@@ -3,6 +3,7 @@ package com.chipIn.ChipIn.services;
 
 import com.chipIn.ChipIn.dto.LoginRequest;
 import com.chipIn.ChipIn.dto.SignupRequest;
+import com.chipIn.ChipIn.dto.UpdateProfileRequest;
 import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.entities.enums.AuthProvider;
 import com.chipIn.ChipIn.entities.enums.UserStatus;
@@ -68,6 +69,19 @@ public class UserService implements UserDetailsService {
         );
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
+    }
+
+    public User updateProfile(User currentUser, UpdateProfileRequest request) {
+        if (request.getName() != null && !request.getName().isEmpty()) {
+            currentUser.setName(request.getName());
+        }
+        if (request.getPhone() != null && !request.getPhone().isEmpty()) {
+            currentUser.setPhone(request.getPhone());
+        }
+        if (request.getProfilePicUrl() != null && !request.getProfilePicUrl().isEmpty()) {
+            currentUser.setProfilePicUrl(request.getProfilePicUrl());
+        }
+        return userRepository.save(currentUser);
     }
 
 }

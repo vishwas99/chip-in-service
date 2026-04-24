@@ -59,4 +59,9 @@ public class Group {
     @Column(name = "is_deleted")
     @Builder.Default
     private boolean isDeleted = false;
+
+    @Version
+    @Column(name = "version")
+    @Builder.Default
+    private Long version = 0L;
 }

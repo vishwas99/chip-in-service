@@ -2,6 +2,7 @@ package com.chipIn.ChipIn.controller;
 
 import com.chipIn.ChipIn.dto.*;
 import com.chipIn.ChipIn.entities.Group;
+import com.chipIn.ChipIn.entities.GroupCurrency;
 import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.repository.CurrencyRepository;
 import com.chipIn.ChipIn.services.GroupService;
@@ -10,12 +11,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/groups")
 @RequiredArgsConstructor
-public class GroupController extends  BaseController{
+public class GroupController extends BaseController {
 
     private final GroupService groupService;
     private final CurrencyRepository currencyRepository;
@@ -78,7 +80,17 @@ public class GroupController extends  BaseController{
     @GetMapping("/user/{userId}")
     public ResponseEntity<GroupsTabResponse> getGroupsDataByUserId(@PathVariable UUID userId) {
         return ResponseEntity.ok(groupService.getGroupsDataByUserId(userId));
-
+    }
+    
+    @PostMapping("/{groupId}/currencies/{currencyId}")
+    public ResponseEntity<GroupCurrency> addGroupCurrency(
+            @PathVariable UUID groupId,
+            @PathVariable UUID currencyId,
+            @RequestParam String name,
+            @RequestParam BigDecimal exchangeRate) {
+            
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(groupService.addGroupCurrency(groupId, currencyId, name, exchangeRate, currentUser));
     }
 
 }

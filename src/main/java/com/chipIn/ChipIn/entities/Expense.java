@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -27,6 +28,7 @@ public class Expense {
     @Column(name = "expenseid")
     private UUID expenseId;
 
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupid", nullable = false)
     private Group group;
@@ -39,6 +41,7 @@ public class Expense {
     private BigDecimal amount;
 
     // Links to "Airport Yen" to get the exact INR conversion later
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "currency_id", nullable = false)
     private GroupCurrency currency;
@@ -50,6 +53,7 @@ public class Expense {
     @Column(name = "receipt_img_url")
     private String receiptImgUrl;
 
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
@@ -76,10 +80,12 @@ public class Expense {
     private String category;
 
     // 1. Link to Payers (Who paid)
+    @ToString.Exclude
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ExpensePayer> payers;
 
     // 2. Link to Splits (Who owes)
+    @ToString.Exclude
     @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ExpenseSplit> splits;
 }

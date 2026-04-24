@@ -2,18 +2,22 @@ package com.chipIn.ChipIn.services;
 
 import com.chipIn.ChipIn.dto.AddMemberRequest;
 import com.chipIn.ChipIn.dto.GroupDashboardResponse;
+import com.chipIn.ChipIn.dto.GroupsTabResponse;
 import com.chipIn.ChipIn.entities.*;
 import com.chipIn.ChipIn.entities.Currency;
 import com.chipIn.ChipIn.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class GroupService {
 
     private final GroupRepository groupRepository;
@@ -22,6 +26,7 @@ public class GroupService {
     private final GroupCurrencyRepository groupCurrencyRepository;
     private final CurrencyRepository currencyRepository;
     private final ExpenseRepository expenseRepository;
+    private final ExpenseService expenseService;
 
     @Transactional // Ensures Group, Member, and Currency all save together
     public Group createGroup(Group groupData, User creator) {
@@ -235,4 +240,40 @@ public class GroupService {
 
         return suggestions;
     }
+
+    public GroupsTabResponse getGroupsDataByUserId(UUID userId){
+//        1. Get all groups user belongs to
+//        2. For each group get all expenses
+        List<Expense> userExpense = expenseService.getExpensesForUser(userId);
+        log.info(userExpense.toString());
+//        3. For each Expense get all splits
+        List<ExpenseSplit> userSplits = expenseService.getSplitsByExpenses(userExpense);
+        log.info(userSplits.toString());
+
+//        4. Tally Expenses - If Paid by user subtract paid splits
+        return null;
+    }
+
+    public Object groupAndTallySplitsForUser(List<Expense> expenses, UUID userId){
+        /*
+
+
+
+         */
+        for(Expense expense : expenses){
+
+            BigDecimal amountPaidByUser = BigDecimal.ZERO;
+
+            for(ExpensePayer payer : expense.getPayers()){
+                if(payer.getUser().getUserid().equals(userId)){
+                    amountPaidByUser =  amountPaidByUser.add(payer.getPaidAmount());
+                }
+
+            }
+
+        }
+
+        return null;
+    }
+
 }

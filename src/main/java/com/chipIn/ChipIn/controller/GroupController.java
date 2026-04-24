@@ -1,9 +1,6 @@
 package com.chipIn.ChipIn.controller;
 
-import com.chipIn.ChipIn.dto.AddMemberRequest;
-import com.chipIn.ChipIn.dto.CreateGroupRequest;
-import com.chipIn.ChipIn.dto.GroupDashboardResponse;
-import com.chipIn.ChipIn.dto.GroupResponse;
+import com.chipIn.ChipIn.dto.*;
 import com.chipIn.ChipIn.entities.Group;
 import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.repository.CurrencyRepository;
@@ -76,6 +73,12 @@ public class GroupController extends  BaseController{
     public ResponseEntity<GroupDashboardResponse> getGroupDashboard(@PathVariable UUID groupId) {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return ResponseEntity.ok(groupService.getGroupDashboard(groupId, currentUser.getUserid()));
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<GroupsTabResponse> getGroupsDataByUserId(@PathVariable UUID userId) {
+        return ResponseEntity.ok(groupService.getGroupsDataByUserId(userId));
+
     }
 
 }

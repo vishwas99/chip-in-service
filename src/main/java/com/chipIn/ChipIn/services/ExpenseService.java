@@ -26,6 +26,7 @@ public class ExpenseService {
     private final UserRepository userRepository;
     private final ExpensePayerRepository expensePayerRepository;
     private final ExpenseSplitRepository expenseSplitRepository;
+    private final GroupMemberRepository groupMemberRepository;
 
     @Transactional
     public String createExpense(UUID groupId, CreateExpenseRequest request, User currentUser){
@@ -119,6 +120,22 @@ public class ExpenseService {
                 .payers(payerDtos)
                 .splits(splitDtos)
                 .build();
+    }
+
+    public List<Expense> getExpensesForUser(UUID userId) {
+        // Step 1: Get all groups the user belongs to
+        List<GroupMember> memberships = groupMemberRepository.findByIdUserId(userId);
+
+        List<Group> groups = memberships.stream()
+                .map(GroupMember::getGroup)
+                .toList();
+
+        // Step 2: Get all expenses for those groups
+        return expenseRepository.findAllByGroupInAndIsDeletedFalse(groups);
+    }
+
+    public List<ExpenseSplit> getSplitsByExpenses(List<Expense> expenses){
+        return expenseSplitRepository.findByExpenseIn(expenses);
     }
 
 }

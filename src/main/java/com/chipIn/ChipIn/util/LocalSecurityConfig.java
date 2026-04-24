@@ -20,14 +20,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @Profile("local")
 public class LocalSecurityConfig {
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public UserDetailsService userDetailsService(UserService userService) {
-        return userService;
-    }
+    // Removed duplicate PasswordEncoder bean definition, as it's already defined in ApplicationConfig.
+    // Removed duplicate UserDetailsService bean definition, as it's already defined in ApplicationConfig.
 
 }

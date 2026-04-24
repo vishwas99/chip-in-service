@@ -2,7 +2,9 @@ package com.chipIn.ChipIn.controller;
 
 import com.chipIn.ChipIn.dto.UpdateProfileRequest;
 import com.chipIn.ChipIn.entities.User;
+import com.chipIn.ChipIn.entities.Currency;
 import com.chipIn.ChipIn.services.UserService;
+import com.chipIn.ChipIn.repository.CurrencyRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController extends BaseController {
 
     private final UserService userService;
+    private final CurrencyRepository currencyRepository;
 
     @Operation(summary = "Get current user profile", description = "Fetches the profile of the currently authenticated user")
     @GetMapping("/me")
@@ -48,5 +51,15 @@ public class UserController extends BaseController {
     public ResponseEntity<String> enableUser(@RequestParam String email) {
         userService.enableUser(email);
         return ResponseEntity.ok("User enabled successfully.");
+    }
+
+    @Operation(summary = "Get current user's default currency", description = "Fetches the default currency of the currently authenticated user")
+    @GetMapping("/me/default-currency")
+    public ResponseEntity<Currency> getDefaultCurrency() {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Currency currency = currencyRepository.findById(currentUser.getDefaultCurrencyId()).orElseThrow(
+                () -> new RuntimeException("Default currency not found")
+        );
+        return ResponseEntity.ok(currency);
     }
 }

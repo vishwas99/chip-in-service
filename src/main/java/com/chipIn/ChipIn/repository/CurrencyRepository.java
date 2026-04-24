@@ -12,6 +12,8 @@ import java.util.UUID;
 public interface CurrencyRepository extends JpaRepository<Currency, UUID> {
     Optional<Currency> findById(UUID currencyId);
 
+    Optional<Currency> findByCode(String code);
+
     @Query("SELECT c FROM Currency c WHERE c.isActive = true AND (c.group IS NULL OR c.group.groupId = :groupId)")
     List<Currency> findActiveCurrenciesForGroupOrGlobal(@Param("groupId") UUID groupId);
 }

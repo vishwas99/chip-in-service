@@ -26,6 +26,8 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        log.info(request.toString());
+
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new RuntimeException("User is not active");
         }
@@ -43,6 +45,7 @@ public class AuthService {
 
         return LoginResponse.builder()
                 .token(jwtToken)
+                .userId(user.getUserid()) // Added userId
                 .name(user.getName())
                 .email(user.getEmail())
                 .build();

@@ -96,6 +96,12 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Spring Boot Starter Mail for email sending -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- Swagger / OpenAPI -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

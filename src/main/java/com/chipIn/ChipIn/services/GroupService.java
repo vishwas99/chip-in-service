@@ -2,6 +2,7 @@ package com.chipIn.ChipIn.services;
 
 import com.chipIn.ChipIn.dto.AddMemberRequest;
 import com.chipIn.ChipIn.dto.GroupDashboardResponse;
+import com.chipIn.ChipIn.dto.GroupResponse;
 import com.chipIn.ChipIn.dto.GroupsTabResponse;
 import com.chipIn.ChipIn.entities.*;
 import com.chipIn.ChipIn.entities.Currency;
@@ -310,4 +311,25 @@ public class GroupService {
         return null;
     }
 
+    public List<GroupResponse> getUserGroups(UUID userId) {
+        List<GroupMember> memberships = groupMemberRepository.findByIdUserId(userId);
+        
+        return memberships.stream()
+                .filter(m -> !m.getGroup().isDeleted())
+                .map(m -> {
+                    Group group = m.getGroup();
+                    return GroupResponse.builder()
+                            .groupId(group.getGroupId())
+                            .name(group.getName())
+                            .description(group.getDescription())
+                            .imageUrl(group.getImageUrl())
+                            .type(group.getType())
+                            .simplifyDebt(group.isSimplifyDebt())
+                            .defaultCurrency(group.getDefaultCurrency())
+                            .createdAt(group.getCreatedAt())
+                            .isAdmin(m.isAdmin())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
 }

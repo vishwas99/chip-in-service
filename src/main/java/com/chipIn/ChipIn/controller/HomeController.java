@@ -3,6 +3,8 @@ package com.chipIn.ChipIn.controller;
 import com.chipIn.ChipIn.dto.HomeFriendsResponse;
 import com.chipIn.ChipIn.dto.HomeGroupsResponse;
 import com.chipIn.ChipIn.entities.User;
+import com.chipIn.ChipIn.entities.Currency;
+import com.chipIn.ChipIn.repository.CurrencyRepository;
 import com.chipIn.ChipIn.services.HomeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,20 +22,43 @@ import java.util.UUID;
 public class HomeController extends BaseController {
 
     private final HomeService homeService;
+    private final CurrencyRepository currencyRepository;
 
     @GetMapping("/groups")
     public ResponseEntity<HomeGroupsResponse> getGroupsView(
-            @RequestParam UUID displayCurrencyId) {
-            
+            @RequestParam(required = false) UUID displayCurrencyId) {
+
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return ResponseEntity.ok(homeService.getHomeGroupsData(currentUser.getUserid(), displayCurrencyId));
+        UUID currencyId = displayCurrencyId;
+        if (currencyId == null) {
+            currencyId = currentUser.getDefaultCurrencyId();
+            if (currencyId == null) {
+                // Fallback to INR
+                Currency inr = currencyRepository.findByCode("INR").orElseThrow(
+                        () -> new RuntimeException("INR currency not found")
+                );
+                currencyId = inr.getCurrencyId();
+            }
+        }
+        return ResponseEntity.ok(homeService.getHomeGroupsData(currentUser.getUserid(), currencyId));
     }
 
     @GetMapping("/friends")
     public ResponseEntity<HomeFriendsResponse> getFriendsView(
-            @RequestParam UUID displayCurrencyId) {
-            
+            @RequestParam(required = false) UUID displayCurrencyId) {
+
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return ResponseEntity.ok(homeService.getHomeFriendsData(currentUser.getUserid(), displayCurrencyId));
+        UUID currencyId = displayCurrencyId;
+        if (currencyId == null) {
+            currencyId = currentUser.getDefaultCurrencyId();
+            if (currencyId == null) {
+                // Fallback to INR
+                Currency inr = currencyRepository.findByCode("INR").orElseThrow(
+                        () -> new RuntimeException("INR currency not found")
+                );
+                currencyId = inr.getCurrencyId();
+            }
+        }
+        return ResponseEntity.ok(homeService.getHomeFriendsData(currentUser.getUserid(), currencyId));
     }
 }

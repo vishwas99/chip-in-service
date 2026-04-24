@@ -16,7 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/groups/{groupId}/expenses")
 @RequiredArgsConstructor
-public class ExpenseController {
+public class ExpenseController extends BaseController {
 
     private final ExpenseService expenseService;
 

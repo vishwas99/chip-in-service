@@ -80,10 +80,24 @@ public class User implements UserDetails {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "default_currency_id")
+    private UUID defaultCurrencyId;
+
     @Version
     @Column(name = "version")
     @Builder.Default
     private Long version = 0L;
+
+    @Column(name = "invitation_token")
+    private String invitationToken;
+
+    @Column(name = "invitation_token_expiry_date")
+    private LocalDateTime invitationTokenExpiryDate;
+
+    // Explicit setter for isRegistered to avoid Lombok boolean naming issues
+    public void setIsRegistered(boolean registered) {
+        isRegistered = registered;
+    }
 
     // --- UserDetails Implementation (For Spring Security) ---
 

@@ -3,6 +3,7 @@ package com.chipIn.ChipIn.repository;
 import com.chipIn.ChipIn.entities.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,4 +15,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Check if email exists (used during signup)
     boolean existsByEmail(String email);
 
+    Optional<User> findByInvitationToken(String invitationToken);
+
+    // Search for users by name or email (case-insensitive)
+    List<User> findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String name, String email);
 }

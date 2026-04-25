@@ -3,11 +3,13 @@ package com.chipIn.ChipIn.dto;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
+@ToString
 public class CreateSettlementRequest {
     @NotNull
     private UUID groupId;

@@ -41,6 +41,7 @@ public class GroupDashboardResponse {
         private LocalDateTime date;
         private String category; // FOOD, TRAVEL
         private String type;     // EXPENSE vs SETTLEMENT
+        private String createdByName; // The name of the user who created the expense
 
         // "You lent ₹500" or "You borrowed ₹200"
         private BigDecimal yourNetShare;

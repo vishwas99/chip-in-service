@@ -36,8 +36,26 @@ public class UserService implements UserDetailsService {
     private final CurrencyRepository currencyRepository;
 
     public User registerUser(SignupRequest signupRequest){
-        if(userRepository.existsByEmail(signupRequest.getEmail())){
-            throw new RuntimeException("User already exists");
+        Optional<User> existingUser = userRepository.findByEmail(signupRequest.getEmail());
+
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            if (user.getStatus() == UserStatus.PENDING_INVITE) {
+                // Update name if different
+                if (!user.getName().equals(signupRequest.getName())) {
+                    user.setName(signupRequest.getName());
+                }
+                // Set password and other fields
+                user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
+                user.setPhone(signupRequest.getPhone());
+                user.setStatus(UserStatus.ACTIVE);
+                user.setIsRegistered(true);
+                user.setInvitationToken(null);
+                user.setInvitationTokenExpiryDate(null);
+                return userRepository.save(user);
+            } else {
+                throw new RuntimeException("User already exists");
+            }
         }
 
         // Set default currency to INR
@@ -48,7 +66,6 @@ public class UserService implements UserDetailsService {
         User user = User.builder().name(signupRequest.getName())
                 .email(signupRequest.getEmail())
                 .password(passwordEncoder.encode(signupRequest.getPassword()))
-                .name(signupRequest.getName())
                 .phone(signupRequest.getPhone())
                 .authProvider(AuthProvider.LOCAL)
                 .status(UserStatus.ACTIVE)
@@ -99,7 +116,7 @@ public class UserService implements UserDetailsService {
     }
 
     public List<User> searchUsers(String query) {
-        return userRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(query, query);
+        return userRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(query);
     }
 
     public List<FriendResponse> getFriends(UUID userId) {
@@ -124,8 +141,8 @@ public class UserService implements UserDetailsService {
         log.info("Collected {} unique user IDs from shared groups after filtering current user.", friendIds.size());
 
 
-        // 4. Fetch the User objects for the friend IDs
-        List<User> friends = userRepository.findAllById(friendIds);
+        // 4. Fetch the User objects for the friend IDs (excluding deleted users)
+        List<User> friends = userRepository.findByIdInActive(friendIds);
         log.info("Fetched {} User objects for friend IDs.", friends.size());
 
         // 5. Map to DTO

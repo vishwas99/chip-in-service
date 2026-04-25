@@ -1,9 +1,6 @@
 package com.chipIn.ChipIn.services;
 
-import com.chipIn.ChipIn.dto.AddMemberRequest;
-import com.chipIn.ChipIn.dto.GroupDashboardResponse;
-import com.chipIn.ChipIn.dto.GroupResponse;
-import com.chipIn.ChipIn.dto.GroupsTabResponse;
+import com.chipIn.ChipIn.dto.*;
 import com.chipIn.ChipIn.entities.*;
 import com.chipIn.ChipIn.entities.Currency;
 import com.chipIn.ChipIn.repository.*;
@@ -179,22 +176,25 @@ public class GroupService {
                 }
             }
 
-            // C. Create the Expense Summary DTO
-            expenseSummaries.add(GroupDashboardResponse.ExpenseSummaryDto.builder()
-                    .expenseId(expense.getExpenseId())
-                    .description(expense.getDescription())
-                    .date(expense.getCreatedAt())
-                    .category(expense.getCategory())
-                    .type(expense.getType().toString())
-                    .yourNetShare(myShareInThisExpense) // + means you lent, - means you owe
-                    .formattedShare(myShareInThisExpense.compareTo(BigDecimal.ZERO) >= 0 ? "You lent" : "You owe")
-                    .build());
+            // C. Create the Expense Summary DTO (exclude SETTLEMENT type - they appear in settlements array)
+            if (!expense.getType().toString().equals("SETTLEMENT")) {
+                expenseSummaries.add(GroupDashboardResponse.ExpenseSummaryDto.builder()
+                        .expenseId(expense.getExpenseId())
+                        .description(expense.getDescription())
+                        .date(expense.getCreatedAt())
+                        .category(expense.getCategory())
+                        .type(expense.getType().toString())
+                        .createdByName(expense.getCreatedBy().getName()) // Add the creator's name
+                        .yourNetShare(myShareInThisExpense) // + means you lent, - means you owe
+                        .formattedShare(myShareInThisExpense.compareTo(BigDecimal.ZERO) >= 0 ? "You lent" : "You owe")
+                        .build());
+            }
         }
 
-        // 4. Convert Balance Map to List DTO
+        // 4. Convert Balance Map to List DTO (excluding deleted users)
         List<GroupDashboardResponse.UserBalanceDto> userBalanceDtos = totalBalances.entrySet().stream()
                 .map(entry -> {
-                    User user = userRepository.findById(entry.getKey()).orElse(null); // Simple lookup
+                    User user = userRepository.findById(entry.getKey()).orElse(null);
                     return GroupDashboardResponse.UserBalanceDto.builder()
                             .userId(entry.getKey())
                             .userName(user != null ? user.getUsername() : "Unknown")
@@ -205,10 +205,14 @@ public class GroupService {
         // 4. Calculate Settlements
         List<GroupDashboardResponse.SettlementSuggestionDto> settlements = calculateSettlements(totalBalances);
 
-        // 5. Enrich with Names (Since DTO only has IDs currently)
+        // 5. Enrich with Names (Since DTO only has IDs currently) - only include active users
         settlements.forEach(s -> {
-            s.setPayerName(userRepository.findById(s.getPayerId()).get().getUsername());
-            s.setPayeeName(userRepository.findById(s.getPayeeId()).get().getUsername());
+            Optional<User> payer = userRepository.findById(s.getPayerId());
+            Optional<User> payee = userRepository.findById(s.getPayeeId());
+            if (payer.isPresent() && payee.isPresent()) {
+                s.setPayerName(payer.get().getUsername());
+                s.setPayeeName(payee.get().getUsername());
+            }
         });
 
         // 5. Final Return
@@ -331,5 +335,296 @@ public class GroupService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    public Boolean isUserInGroup(UUID groupId, UUID userId){
+        return groupMemberRepository.findByGroupIdAndUserId(groupId, userId) != null;
+    }
+
+    public List<FriendResponse> getGroupUsers(UUID groupId){
+        List<GroupMember> members = groupMemberRepository.findByGroupGroupId(groupId);
+        return members.stream().map(m ->{
+            return new FriendResponse(m.getUser().getUserid(), m.getUser().getName(), m.getUser().getEmail(), m.getUser().getProfilePicUrl());
+        }).toList();
+    }
+
+    public Currency getGeoBasedCurrency(){
+        return currencyRepository.findByCode("INR").orElseThrow(() -> new RuntimeException("Default currency INR not found"));
+    }
+
+    @Transactional
+    public void deleteGroup(UUID groupId, boolean hardDelete, User currentUser) {
+        // 1. Fetch the Group
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        // 2. Permission Check: Is the current user an Admin of this group?
+        GroupMemberId currentUserMemberId = new GroupMemberId(groupId, currentUser.getUserid());
+        GroupMember currentMember = groupMemberRepository.findById(currentUserMemberId)
+                .orElseThrow(() -> new RuntimeException("You are not a member of this group"));
+
+        if (!currentMember.isAdmin()) {
+            throw new RuntimeException("Only group admins can delete the group");
+        }
+
+        if (hardDelete) {
+            // Hard delete: Mark all expenses as deleted
+            List<Expense> expenses = expenseRepository.findByGroup_GroupId(groupId);
+            for (Expense expense : expenses) {
+                expense.setDeleted(true);
+                expenseRepository.save(expense);
+            }
+            // Mark group as deleted
+            group.setDeleted(true);
+            groupRepository.save(group);
+        } else {
+            // Soft delete: Check for unsettled expenses
+            Map<UUID, BigDecimal> totalBalances = calculateGroupBalances(groupId);
+            boolean hasUnsettled = totalBalances.values().stream().anyMatch(balance -> balance.compareTo(BigDecimal.ZERO) != 0);
+
+            if (hasUnsettled) {
+                // Mark group as deleted
+                group.setDeleted(true);
+                groupRepository.save(group);
+            } else {
+                throw new RuntimeException("Cannot delete group: There are unsettled expenses. Use hard delete to force deletion.");
+            }
+        }
+    }
+
+    private Map<UUID, BigDecimal> calculateGroupBalances(UUID groupId) {
+        List<Expense> expenses = expenseRepository.findByGroupGroupIdAndIsDeletedFalse(groupId);
+        Map<UUID, BigDecimal> totalBalances = new HashMap<>();
+
+        for (Expense expense : expenses) {
+            BigDecimal rate = expense.getCurrency().getExchangeRate();
+
+            // Process Payers (+)
+            for (ExpensePayer payer : expense.getPayers()) {
+                BigDecimal amountInDefault = payer.getPaidAmount().multiply(rate);
+                totalBalances.merge(payer.getUser().getUserid(), amountInDefault, BigDecimal::add);
+            }
+
+            // Process Splits (-)
+            for (ExpenseSplit split : expense.getSplits()) {
+                BigDecimal amountInDefault = split.getAmountOwed().multiply(rate);
+                totalBalances.merge(split.getUser().getUserid(), amountInDefault.negate(), BigDecimal::add);
+            }
+        }
+
+        return totalBalances;
+    }
+
+    public GroupBalancesResponse getGroupBalances(UUID groupId, UUID currentUserId) {
+        // 1. Fetch the Group
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new RuntimeException("Group not found"));
+
+        // 2. Permission Check: Is the current user a member of this group?
+        GroupMemberId currentUserMemberId = new GroupMemberId(groupId, currentUserId);
+        GroupMember currentMember = groupMemberRepository.findById(currentUserMemberId)
+                .orElseThrow(() -> new RuntimeException("You are not a member of this group"));
+
+        // 3. Get all non-deleted expenses in the group (including settlements)
+        List<Expense> expenses = expenseRepository.findByGroupGroupIdAndIsDeletedFalse(groupId);
+
+        // 4. Calculate pairwise balances and transactions
+        Map<String, BigDecimal> userPairBalances = new HashMap<>(); // "user1_user2" -> amount (user1 owes user2)
+        Map<String, List<GroupBalancesResponse.TransactionDto>> userPairTransactions = new HashMap<>();
+
+        for (Expense expense : expenses) {
+            BigDecimal rate = expense.getCurrency().getExchangeRate();
+            BigDecimal totalAmount = expense.getAmount().multiply(rate);
+
+            // Calculate total paid and total owed
+            BigDecimal totalPaid = expense.getPayers().stream()
+                    .map(p -> p.getPaidAmount().multiply(rate))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal totalOwed = expense.getSplits().stream()
+                    .map(s -> s.getAmountOwed().multiply(rate))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // For each payer-splitter pair
+            for (ExpensePayer payer : expense.getPayers()) {
+                for (ExpenseSplit splitter : expense.getSplits()) {
+                    if (!payer.getUser().getUserid().equals(splitter.getUser().getUserid())) {
+                        // Calculate how much this payer owes this splitter for this expense
+                        BigDecimal payerContribution = payer.getPaidAmount().multiply(rate);
+                        BigDecimal splitterShare = splitter.getAmountOwed().multiply(rate);
+
+                        // Proportional amount: (payer's payment / total paid) * splitter's share
+                        BigDecimal amountOwed = BigDecimal.ZERO;
+                        if (totalPaid.compareTo(BigDecimal.ZERO) > 0) {
+                            amountOwed = payerContribution.multiply(splitterShare).divide(totalPaid, 2, BigDecimal.ROUND_HALF_UP);
+                        }
+
+                        // Create canonical pair key (smaller UUID first)
+                        UUID payerId = payer.getUser().getUserid();
+                        UUID splitterId = splitter.getUser().getUserid();
+                        String pairKey = createPairKey(payerId, splitterId);
+
+                        // Update balance: store always as (firstUuid owes secondUuid).
+                        // amountOwed is amount payer owes splitter. If payerId is the first UUID in the
+                        // canonical ordering, add as positive; otherwise store as negative so the
+                        // canonical meaning (first owes second) holds.
+                        BigDecimal currentBalance = userPairBalances.getOrDefault(pairKey, BigDecimal.ZERO);
+                        if (payerId.compareTo(splitterId) < 0) {
+                            userPairBalances.put(pairKey, currentBalance.add(amountOwed));
+                        } else {
+                            userPairBalances.put(pairKey, currentBalance.add(amountOwed.negate()));
+                        }
+
+                        // Add transaction for payer (negative = paid)
+                        String payerKey = payer.getUser().getUserid() + "_" + splitter.getUser().getUserid();
+                        userPairTransactions.computeIfAbsent(payerKey, k -> new ArrayList<>()).add(
+                                GroupBalancesResponse.TransactionDto.builder()
+                                        .transactionId(expense.getExpenseId())
+                                        .type(expense.getType().toString())
+                                        .description(expense.getDescription())
+                                        .date(expense.getCreatedAt())
+                                        .amount(amountOwed.negate()) // Negative because payer paid
+                                        .currencyCode(expense.getCurrency().getMasterCurrency().getCode())
+                                        .build()
+                        );
+
+                        // Add transaction for splitter (positive = received)
+                        String splitterKey = splitter.getUser().getUserid() + "_" + payer.getUser().getUserid();
+                        userPairTransactions.computeIfAbsent(splitterKey, k -> new ArrayList<>()).add(
+                                GroupBalancesResponse.TransactionDto.builder()
+                                        .transactionId(expense.getExpenseId())
+                                        .type(expense.getType().toString())
+                                        .description(expense.getDescription())
+                                        .date(expense.getCreatedAt())
+                                        .amount(amountOwed) // Positive because splitter received
+                                        .currencyCode(expense.getCurrency().getMasterCurrency().getCode())
+                                        .build()
+                        );
+                    }
+                }
+            }
+        }
+
+        // 5. Calculate net balance per user from current user's perspective
+        Map<UUID, BigDecimal> userNetBalances = new HashMap<>();
+        for (Map.Entry<String, BigDecimal> entry : userPairBalances.entrySet()) {
+            String[] userIds = entry.getKey().split("_");
+            UUID user1 = UUID.fromString(userIds[0]);
+            UUID user2 = UUID.fromString(userIds[1]);
+            BigDecimal amount = entry.getValue();
+
+            // user1 owes user2 the amount
+            // From user1's perspective: they owe user2 (negative)
+            // From user2's perspective: user1 owes them (positive)
+            userNetBalances.merge(user1, amount.negate(), BigDecimal::add); // user1 owes
+            userNetBalances.merge(user2, amount, BigDecimal::add); // user2 is owed
+        }
+
+        // 6. Create user balance DTOs (excluding current user)
+        List<GroupBalancesResponse.UserBalanceDto> userBalanceDtos = userNetBalances.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(currentUserId))
+                .map(entry -> {
+                    User user = userRepository.findByIdActive(entry.getKey()).orElse(null);
+                    String balanceStatus;
+                    if (entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
+                        balanceStatus = "Owes you";
+                    } else if (entry.getValue().compareTo(BigDecimal.ZERO) < 0) {
+                        balanceStatus = "You owe";
+                    } else {
+                        balanceStatus = "Settled";
+                    }
+
+                    return GroupBalancesResponse.UserBalanceDto.builder()
+                            .userId(entry.getKey())
+                            .userName(user != null ? user.getName() : "Unknown")
+                            .netBalance(entry.getValue())
+                            .balanceStatus(balanceStatus)
+                            .build();
+                })
+                .sorted((a, b) -> b.getNetBalance().abs().compareTo(a.getNetBalance().abs()))
+                .collect(Collectors.toList());
+
+        // 7. Create transaction history per user
+        List<GroupBalancesResponse.UserTransactionHistoryDto> transactionHistory = userNetBalances.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(currentUserId))
+                .map(entry -> {
+                    User otherUser = userRepository.findByIdActive(entry.getKey()).orElse(null);
+                    // Fetch transactions where current user is payer and where current user is splitter
+                    List<GroupBalancesResponse.TransactionDto> txFromCurrent = userPairTransactions.getOrDefault(
+                            currentUserId + "_" + entry.getKey(), new ArrayList<>());
+                    List<GroupBalancesResponse.TransactionDto> txFromOther = userPairTransactions.getOrDefault(
+                            entry.getKey() + "_" + currentUserId, new ArrayList<>());
+
+                    // Combine and deduplicate transactions by transactionId, preferring the entry
+                    // that represents the perspective of the current user (payer -> negative amount,
+                    // receiver -> positive amount). This avoids showing the same expense twice with
+                    // both signs.
+                    List<GroupBalancesResponse.TransactionDto> combined = new ArrayList<>();
+                    combined.addAll(txFromCurrent);
+                    combined.addAll(txFromOther);
+
+                    Map<java.util.UUID, java.util.List<GroupBalancesResponse.TransactionDto>> grouped = combined.stream()
+                            .collect(Collectors.groupingBy(GroupBalancesResponse.TransactionDto::getTransactionId, LinkedHashMap::new, Collectors.toList()));
+
+                    List<GroupBalancesResponse.TransactionDto> transactions = new ArrayList<>();
+                    for (Map.Entry<java.util.UUID, java.util.List<GroupBalancesResponse.TransactionDto>> gentry : grouped.entrySet()) {
+                        java.util.UUID txId = gentry.getKey();
+                        java.util.List<GroupBalancesResponse.TransactionDto> variants = gentry.getValue();
+
+                        // Determine if current user acted as payer in the original expense
+                        Expense relatedExpense = expenseRepository.findById(txId).orElse(null);
+                        boolean currentIsPayer = false;
+                        if (relatedExpense != null) {
+                            currentIsPayer = relatedExpense.getPayers().stream()
+                                    .anyMatch(p -> p.getUser().getUserid().equals(currentUserId));
+                        }
+
+                        GroupBalancesResponse.TransactionDto chosen = null;
+                        if (currentIsPayer) {
+                            // prefer negative amount (current user paid)
+                            for (GroupBalancesResponse.TransactionDto v : variants) {
+                                if (v.getAmount().compareTo(BigDecimal.ZERO) < 0) {
+                                    chosen = v;
+                                    break;
+                                }
+                            }
+                        } else {
+                            // prefer positive amount (current user received)
+                            for (GroupBalancesResponse.TransactionDto v : variants) {
+                                if (v.getAmount().compareTo(BigDecimal.ZERO) > 0) {
+                                    chosen = v;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (chosen == null && !variants.isEmpty()) chosen = variants.get(0);
+                        if (chosen != null) transactions.add(chosen);
+                    }
+
+                    // Sort transactions by date (newest first)
+                    transactions.sort((a, b) -> b.getDate().compareTo(a.getDate()));
+
+                    return GroupBalancesResponse.UserTransactionHistoryDto.builder()
+                            .otherUserId(entry.getKey())
+                            .otherUserName(otherUser != null ? otherUser.getName() : "Unknown")
+                            .netAmount(entry.getValue())
+                            .transactions(transactions)
+                            .build();
+                })
+                .sorted((a, b) -> b.getNetAmount().abs().compareTo(a.getNetAmount().abs()))
+                .collect(Collectors.toList());
+
+        return GroupBalancesResponse.builder()
+                .groupId(group.getGroupId())
+                .groupName(group.getName())
+                .currencyCode(group.getDefaultCurrency().getCode())
+                .userBalances(userBalanceDtos)
+                .transactionHistory(transactionHistory)
+                .build();
+    }
+
+    private String createPairKey(UUID user1, UUID user2) {
+        return user1.compareTo(user2) < 0 ? user1 + "_" + user2 : user2 + "_" + user1;
     }
 }

@@ -1,5 +1,6 @@
 package com.chipIn.ChipIn.controller;
 
+import com.chipIn.ChipIn.dto.FriendResponse;
 import com.chipIn.ChipIn.dto.UpdateProfileRequest;
 import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.entities.Currency;
@@ -12,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 
 @RestController
@@ -61,5 +64,18 @@ public class UserController extends BaseController {
                 () -> new RuntimeException("Default currency not found")
         );
         return ResponseEntity.ok(currency);
+    }
+
+    @Operation(summary = "Get all friends of the user", description = "Friends of the currently authenticated user")
+    @GetMapping("/friends")
+    public ResponseEntity<List<FriendResponse>> getFriends(){
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(userService.getFriends(currentUser.getUserid()));
+    }
+
+    @Operation(summary = "Search users by name or email", description = "Searches for users by name or email (case-insensitive). Useful for populating a dropdown or autocomplete field when adding users to a group.")
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchUsers(@RequestParam String query) {
+        return ResponseEntity.ok(userService.searchUsers(query));
     }
 }

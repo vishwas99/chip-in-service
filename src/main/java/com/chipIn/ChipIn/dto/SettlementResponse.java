@@ -9,9 +9,9 @@ import java.util.UUID;
 @Data
 @Builder
 @AllArgsConstructor
-public class FriendResponse {
-    private UUID userId;
-    private String name;
-    private String email;
-    private String profilePicUrl;
+public class SettlementResponse {
+    private UUID settlementId;
+    private String message;
+    private String status; // "SUCCESS" or "FAILED"
 }
+

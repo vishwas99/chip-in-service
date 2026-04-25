@@ -7,16 +7,19 @@ import com.chipIn.ChipIn.dto.ExpenseSplitDto;
 import com.chipIn.ChipIn.entities.*;
 import com.chipIn.ChipIn.entities.enums.ExpenseType;
 import com.chipIn.ChipIn.repository.*;
-import jakarta.transaction.TransactionScoped;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
@@ -27,24 +30,65 @@ public class ExpenseService {
     private final ExpensePayerRepository expensePayerRepository;
     private final ExpenseSplitRepository expenseSplitRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final CurrencyService currencyService;
 
     @Transactional
-    public String createExpense(UUID groupId, CreateExpenseRequest request, User currentUser){
+    public String createExpense(UUID groupId, CreateExpenseRequest request, User currentUser) {
 
-        // 1. Fetch Group and Currency
+        log.info(request.toString());
+
+        // 1. Validate request parameters
+        if (groupId == null) {
+            log.error("Expense creation failed: Group ID is null");
+            throw new IllegalArgumentException("Group ID cannot be null");
+        }
+        if (request.getCurrencyId() == null) {
+            log.error("Expense creation failed: Currency ID is null");
+            throw new IllegalArgumentException("Currency ID cannot be null");
+        }
+        if (request.getDescription() == null || request.getDescription().trim().isEmpty()) {
+            log.error("Expense creation failed: Description is null or empty");
+            throw new IllegalArgumentException("Expense description cannot be null or empty");
+        }
+        if (request.getAmount() == null) {
+            log.error("Expense creation failed: Amount is null");
+            throw new IllegalArgumentException("Amount cannot be null");
+        }
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            log.error("Expense creation failed: Invalid amount: {}", request.getAmount());
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+        if (request.getSplitType() == null || request.getSplitType().trim().isEmpty()) {
+            log.error("Expense creation failed: Split type is null or empty");
+            throw new IllegalArgumentException("Split type cannot be null or empty");
+        }
+        if (request.getPayers() == null || request.getPayers().isEmpty()) {
+            log.error("Expense creation failed: No payers provided");
+            throw new IllegalArgumentException("At least one payer is required");
+        }
+        if (request.getSplits() == null || request.getSplits().isEmpty()) {
+            log.error("Expense creation failed: No splits provided");
+            throw new IllegalArgumentException("At least one split is required");
+        }
+
+        log.info("Creating expense: description={}, amount={}, payers={}, splits={}, group={}",
+                 request.getDescription(), request.getAmount(), request.getPayers().size(),
+                 request.getSplits().size(), groupId);
+
+        // 2. Fetch Group
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
 
-        GroupCurrency currency = groupCurrencyRepository.findById(request.getCurrencyId())
-                .orElseThrow(() -> new RuntimeException("Currency not found"));
+        // 3. Validate and get the currency (handles both GroupCurrency and global Currency)
+        GroupCurrency groupCurrency = currencyService.validateAndGetGroupCurrency(groupId, request.getCurrencyId(), currentUser);
 
-        // 2. Build and Save the Main Expense
+        // 4. Build and Save the Main Expense
         Expense expense = Expense.builder()
                 .group(group)
                 .createdBy(currentUser)
                 .description(request.getDescription())
                 .amount(request.getAmount())
-                .currency(currency) // ✅ Fixed
+                .currency(groupCurrency)
                 .type(ExpenseType.EXPENSE)
                 .splitType(request.getSplitType())
                 .receiptImgUrl(request.getReceiptImgUrl())
@@ -52,7 +96,7 @@ public class ExpenseService {
 
         Expense savedExpense = expenseRepository.save(expense);
 
-        // 3. Save ALL Payers
+        // 5. Save ALL Payers
         List<ExpensePayer> payers = request.getPayers().stream().map(payerDto -> {
             User user = userRepository.findById(payerDto.getUserId())
                     .orElseThrow(() -> new RuntimeException("User not found: " + payerDto.getUserId()));
@@ -66,7 +110,7 @@ public class ExpenseService {
 
         expensePayerRepository.saveAll(payers);
 
-        // 4. Save ALL Splits
+        // 6. Save ALL Splits
         List<ExpenseSplit> splits = request.getSplits().stream().map(splitDto -> {
             User user = userRepository.findById(splitDto.getUserId())
                     .orElseThrow(() -> new RuntimeException("User not found: " + splitDto.getUserId()));
@@ -134,7 +178,7 @@ public class ExpenseService {
         return expenseRepository.findAllByGroupInAndIsDeletedFalse(groups);
     }
 
-    public List<ExpenseSplit> getSplitsByExpenses(List<Expense> expenses){
+    public List<ExpenseSplit> getSplitsByExpenses(List<Expense> expenses) {
         return expenseSplitRepository.findByExpenseIn(expenses);
     }
 

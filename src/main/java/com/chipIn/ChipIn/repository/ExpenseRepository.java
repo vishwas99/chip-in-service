@@ -18,4 +18,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     List<Expense> findAllByGroupInAndIsDeletedFalse(List<Group> groups);
 
+    List<Expense> findByGroup_GroupId(UUID groupId);
+
+    List<Expense> findByGroupGroupIdAndIsDeletedFalse(UUID groupId);
 }

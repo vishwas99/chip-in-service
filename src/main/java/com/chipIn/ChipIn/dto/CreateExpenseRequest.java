@@ -1,12 +1,14 @@
 package com.chipIn.ChipIn.dto;
 
 import lombok.Data;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 @Data
+@ToString
 public class CreateExpenseRequest {
     private String description;
 

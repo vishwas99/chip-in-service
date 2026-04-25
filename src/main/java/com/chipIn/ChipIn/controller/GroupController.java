@@ -59,7 +59,7 @@ public class GroupController extends BaseController {
                 .imageUrl(request.getImageUrl())
                 .type(request.getType())
                 .simplifyDebt(request.isSimplifyDebt())
-                .defaultCurrency(currencyRepository.findById(request.getDefaultCurrencyId()).orElse(null))
+                .defaultCurrency(currencyRepository.findById(request.getDefaultCurrencyId()).orElse(groupService.getGeoBasedCurrency()))
                 .build();
 
         // 3. Call the Service to create group & membership
@@ -119,6 +119,12 @@ public class GroupController extends BaseController {
         return ResponseEntity.ok(groupService.getGroupDashboard(groupId, currentUser.getUserid()));
     }
 
+    @GetMapping("/{groupId}/balances")
+    public ResponseEntity<GroupBalancesResponse> getGroupBalances(@PathVariable UUID groupId) {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(groupService.getGroupBalances(groupId, currentUser.getUserid()));
+    }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<GroupsTabResponse> getGroupsDataByUserId(@PathVariable UUID userId) {
         return ResponseEntity.ok(groupService.getGroupsDataByUserId(userId));
@@ -144,4 +150,40 @@ public class GroupController extends BaseController {
         return ResponseEntity.ok(groupService.addGroupCurrency(groupId, currencyId, name, exchangeRate, currentUser));
     }
 
+    @GetMapping("/users/{groupId}")
+    public ResponseEntity<List<FriendResponse>> getGroupUsers(@PathVariable UUID groupId){
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+//        If user not part of group return 403
+        if(!groupService.isUserInGroup(groupId, currentUser.getUserid())){
+            return ResponseEntity.status(403).build();
+        } else {
+            return ResponseEntity.ok(groupService.getGroupUsers(groupId));
+        }
+    }
+
+    /**
+     * Deletes a group. Only admins of the group can perform this action.
+     * If hardDelete is true, the group is permanently deleted. Otherwise, it is archived.
+     *
+     * @param groupId The ID of the group to delete.
+     * @param hardDelete Optional. If true, the group is permanently deleted. Default is false.
+     * @return A ResponseEntity indicating the success or failure of the delete operation.
+     */
+    @Operation(summary = "Delete a group",
+            description = "Deletes a group by ID. Requires admin privileges within the group.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Group deleted successfully",
+                            content = @Content(mediaType = "text/plain", schema = @Schema(implementation = String.class))),
+                    @ApiResponse(responseCode = "401", description = "Unauthorized, if no valid token is provided"),
+                    @ApiResponse(responseCode = "403", description = "Forbidden, if the current user is not an admin of the group"),
+                    @ApiResponse(responseCode = "404", description = "Group not found")
+            })
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<String> deleteGroup(
+            @PathVariable UUID groupId,
+            @RequestParam(defaultValue = "false") boolean hardDelete) {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        groupService.deleteGroup(groupId, hardDelete, currentUser);
+        return ResponseEntity.ok("Group deleted successfully");
+    }
 }

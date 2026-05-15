@@ -227,7 +227,7 @@ public class GroupService {
                 .build();
     }
 
-    private List<GroupDashboardResponse.SettlementSuggestionDto> calculateSettlements(Map<UUID, BigDecimal> balances) {
+    List<GroupDashboardResponse.SettlementSuggestionDto> calculateSettlements(Map<UUID, BigDecimal> balances) {
         List<GroupDashboardResponse.SettlementSuggestionDto> suggestions = new ArrayList<>();
 
         // 1. Separate into Debtors (-) and Creditors (+)

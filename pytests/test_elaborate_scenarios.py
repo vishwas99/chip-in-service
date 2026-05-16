@@ -1,11 +1,15 @@
-import requests
-import pytest
-import uuid
+import os
 import random
 import string
+import uuid
+
+import pytest
+import requests
 from decimal import Decimal
 
-BASE_URL = "http://localhost:8080"
+# This module creates throwaway users on each run, so it does not need
+# pre-seeded credentials — but the target host is still env-driven.
+BASE_URL = os.environ.get("CHIPIN_BASE_URL", "http://localhost:8080")
 
 def random_string(length=8):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))

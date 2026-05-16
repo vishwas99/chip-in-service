@@ -1,0 +1,27 @@
+# Default-deny everything ingress, then open only what's needed.
+# Egress is intentionally left open here because the service talks to:
+#   - PostgreSQL (cluster-internal or managed DB)
+#   - Resend API (https)
+#   - Future: FX rate provider
+# Tighten egress with explicit allow rules once the actual targets are known.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: chipin-service-ingress
+  namespace: chipin
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: chipin-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow ingress only from the API gateway / sidecar pods. Replace the
+    # label selector with whatever your ingress namespace uses.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress
+      ports:
+        - protocol: TCP
+          port: 8080

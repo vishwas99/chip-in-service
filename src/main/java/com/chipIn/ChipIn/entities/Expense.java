@@ -1,6 +1,7 @@
 package com.chipIn.ChipIn.entities;
 
 import com.chipIn.ChipIn.entities.enums.ExpenseType;
+import com.chipIn.ChipIn.entities.enums.SplitType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -47,8 +48,9 @@ public class Expense {
     private GroupCurrency currency;
 
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "split_type", nullable = false)
-    private String splitType; // EQUAL, PERCENTAGE, EXACT, SHARES
+    private SplitType splitType;
 
     @Column(name = "receipt_img_url")
     private String receiptImgUrl;

@@ -11,6 +11,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Global currency catalog. Group-scoped buckets live under
+ * `/api/groups/{groupId}/currencies` and are managed by GroupController.
+ */
 @RestController
 @RequestMapping("/api/currencies")
 @RequiredArgsConstructor
@@ -18,9 +22,8 @@ public class CurrencyController extends BaseController {
 
     private final CurrencyService currencyService;
 
-    // We pass the groupId as an optional request param to get relevant currencies
-    @GetMapping("")
-    public ResponseEntity<List<Currency>> getCurrencies(@RequestParam(required = false, name = "groupId") UUID groupId) {
+    @GetMapping
+    public ResponseEntity<List<Currency>> getCurrencies(@RequestParam(required = false) UUID groupId) {
         return ResponseEntity.ok(currencyService.getCurrenciesForGroup(groupId));
     }
 
@@ -31,12 +34,17 @@ public class CurrencyController extends BaseController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("")
+    /**
+     * Create a new global currency. Group-scoped Currency rows are no longer
+     * accepted here — use POST /api/groups/{groupId}/currencies for custom
+     * group buckets.
+     */
+    @PostMapping
     public ResponseEntity<Currency> createCurrency(@Valid @RequestBody Currency currency) {
-        Currency createdCurrency = currencyService.createCurrency(currency);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdCurrency);
+        Currency created = currencyService.createCurrency(currency);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
-    
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCurrency(@PathVariable("id") UUID id) {
         currencyService.deleteCurrency(id);

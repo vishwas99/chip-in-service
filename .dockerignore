@@ -1,0 +1,31 @@
+# Keep build context small and reproducible
+target/
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+.mvn/wrapper/maven-wrapper.jar
+*.iml
+*.log
+
+# IDE / OS clutter
+.DS_Store
+Thumbs.db
+
+# Docs are not needed inside the image
+*.md
+docs/
+
+# Local-only profiles must NEVER be baked into the image
+application-local.properties
+application-local.yml
+application-local.yaml
+.env*
+
+# Tests / non-runtime
+pytests/
+nginx-test/
+
+# CI metadata
+.github/

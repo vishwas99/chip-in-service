@@ -1,4 +1,46 @@
-target
-.idea
-.mvn
-/.idea/
+# Build output
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+
+# Maven wrapper internals
+.mvn/wrapper/maven-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Local secrets / per-developer overrides
+application-local.properties
+application-local.yml
+application-local.yaml
+.env
+.env.*
+!.env.example
+
+# Python (pytests/)
+pytests/__pycache__/
+pytests/.pytest_cache/
+*.pyc
+
+# Coverage
+.coverage
+htmlcov/

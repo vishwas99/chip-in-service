@@ -7,8 +7,10 @@ import com.chipIn.ChipIn.entities.User;
 import com.chipIn.ChipIn.repository.CurrencyRepository;
 import com.chipIn.ChipIn.repository.GroupCurrencyRepository;
 import com.chipIn.ChipIn.repository.GroupRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,19 +18,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class CurrencyService {
 
     private final CurrencyRepository currencyRepository;
     private final GroupRepository groupRepository;
     private final GroupCurrencyRepository groupCurrencyRepository;
-
-    @Autowired
-    public CurrencyService(CurrencyRepository currencyRepository, GroupRepository groupRepository,
-                           GroupCurrencyRepository groupCurrencyRepository) {
-        this.currencyRepository = currencyRepository;
-        this.groupRepository = groupRepository;
-        this.groupCurrencyRepository = groupCurrencyRepository;
-    }
 
     public List<Currency> getCurrenciesForGroup(UUID groupId) {
         return currencyRepository.findActiveCurrenciesForGroupOrGlobal(groupId);
@@ -39,83 +34,73 @@ public class CurrencyService {
                 .filter(Currency::isActive);
     }
 
+    /**
+     * Create a global currency (group must be null). Group-scoped Currency rows
+     * are no longer supported — use GroupCurrency for per-group buckets.
+     */
     public Currency createCurrency(Currency currency) {
-        // Verify if it's a valid group if a group is provided (custom currency)
-        if (currency.getGroup() != null && currency.getGroup().getGroupId() != null) {
-            Group group = groupRepository.findById(currency.getGroup().getGroupId())
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid Group ID: Group does not exist"));
-            currency.setGroup(group);
-        } else {
-            currency.setGroup(null); // Explicitly ensure it's null for global currencies
+        if (currency.getGroup() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Group-scoped currencies have been replaced by group_currencies. " +
+                            "Use POST /api/groups/{groupId}/currencies instead.");
         }
+        currency.setGroup(null);
         return currencyRepository.save(currency);
     }
 
     /**
-     * Global method to validate and get a GroupCurrency for a group.
-     * This handles both:
-     * - Currencies in the group_currencies table (custom group currencies)
-     * - Global currencies in the currencies table (global currencies used by a group)
+     * Resolves the currency identified by `currencyId` for an expense in `groupId`,
+     * always returning a `GroupCurrency` bucket the expense can point at.
      *
-     * The method ensures that:
-     * 1. The currency exists (either as GroupCurrency or global Currency)
-     * 2. The currency is active
-     * 3. If it's a global currency, it's not specific to another group
-     * 4. If it's a global currency, a corresponding GroupCurrency is created/fetched
+     * Accepts:
+     *   - A GroupCurrency id (must belong to this group, must be active).
+     *   - A global Currency id — the resolver auto-creates a default bucket
+     *     in this group with origin = master = the global currency and rate = 1.
      *
-     * @param groupId the ID of the group
-     * @param currencyId the ID of the currency (could be from GroupCurrency or Currency table)
-     * @param currentUser the user making the request (needed if creating a new GroupCurrency)
-     * @return the validated GroupCurrency
-     * @throws RuntimeException if the group is not found
-     * @throws IllegalArgumentException if the currency is not found or not valid for this group
+     * Throws 400 for any inconsistency.
      */
     public GroupCurrency validateAndGetGroupCurrency(UUID groupId, UUID currencyId, User currentUser) {
-        // Fetch the group first
         Group group = groupRepository.findById(groupId)
-                .orElseThrow(() -> new RuntimeException("Group not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
 
-        // Step 1: Try to fetch from GroupCurrency table first
         Optional<GroupCurrency> groupCurrencyOpt = groupCurrencyRepository.findById(currencyId);
         if (groupCurrencyOpt.isPresent()) {
             GroupCurrency groupCurrency = groupCurrencyOpt.get();
-
-            // Validate that this GroupCurrency belongs to the requested group
             if (!groupCurrency.getGroup().getGroupId().equals(groupId)) {
-                throw new IllegalArgumentException("Currency does not belong to this group");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Currency does not belong to this group");
             }
-
+            if (!groupCurrency.isActive()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Currency bucket is not active");
+            }
+            // Reject FX rate rows (origin != master) — they're not valid expense buckets.
+            if (groupCurrency.getOriginCurrency() != null
+                    && !groupCurrency.getOriginCurrency().getCurrencyId().equals(groupCurrency.getMasterCurrency().getCurrencyId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "This entry is an FX rate row and cannot be used as an expense currency");
+            }
             return groupCurrency;
         }
 
-        // Step 2: Try to fetch from global Currency table
-        Optional<Currency> globalCurrencyOpt = currencyRepository.findById(currencyId);
-        if (globalCurrencyOpt.isEmpty()) {
-            throw new IllegalArgumentException("Currency not found");
-        }
+        Currency globalCurrency = currencyRepository.findById(currencyId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Currency not found"));
 
-        Currency globalCurrency = globalCurrencyOpt.get();
-
-        // Validate the global currency
         if (!globalCurrency.isActive()) {
-            throw new IllegalArgumentException("Currency is not active");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Currency is not active");
         }
-
-        // If currency has a group (custom currency for another group), reject it
         if (globalCurrency.getGroup() != null && !globalCurrency.getGroup().getGroupId().equals(groupId)) {
-            throw new IllegalArgumentException("This custom currency does not belong to this group");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This custom currency does not belong to this group");
         }
 
-        // Step 3: Find or create the GroupCurrency mapping for this group and global currency
         return groupCurrencyRepository.findByGroupAndMasterCurrency(group, globalCurrency)
                 .orElseGet(() -> {
-                    // Create a new GroupCurrency mapping if it doesn't exist
                     GroupCurrency newGroupCurrency = GroupCurrency.builder()
                             .group(group)
+                            .originCurrency(globalCurrency)
                             .masterCurrency(globalCurrency)
                             .name(globalCurrency.getName())
-                            .exchangeRate(BigDecimal.ONE) // Default exchange rate
+                            .exchangeRate(BigDecimal.ONE)
                             .createdBy(currentUser)
+                            .isActive(true)
                             .build();
                     return groupCurrencyRepository.save(newGroupCurrency);
                 });

@@ -1,15 +1,35 @@
-import requests
+import os
+
 import pytest
+import requests
 from decimal import Decimal
 
-BASE_URL = "http://localhost:8080"
+# Pytests are intentionally NOT run inside the JVM test phase — they hit a
+# locally-running ChipIn instance. All connection knobs come from the
+# environment so credentials never live in the repo.
+#
+#   export CHIPIN_BASE_URL=http://localhost:8080
+#   export CHIPIN_TEST_USERS='[{"email":"alice@example.com","password":"..."}]'
+#   pytest pytests/
 
-# Enter your 3 active test accounts here
-USERS = [
-    {"email": "hendricksgeek@gmail.com", "password": "password"},
-    {"email": "vishwasravali@gmail.com", "password": "password"},
-    {"email": "khvish99@gmail.com", "password": "password"}
-]
+BASE_URL = os.environ.get("CHIPIN_BASE_URL", "http://localhost:8080")
+
+_USERS_RAW = os.environ.get("CHIPIN_TEST_USERS")
+if not _USERS_RAW:
+    pytest.skip(
+        "CHIPIN_TEST_USERS env var not set; skipping end-to-end pytests. "
+        "Set it to a JSON list of {email,password} objects to run.",
+        allow_module_level=True,
+    )
+
+try:
+    import json
+    USERS = json.loads(_USERS_RAW)
+    assert isinstance(USERS, list) and len(USERS) >= 3
+    for u in USERS:
+        assert "email" in u and "password" in u
+except Exception as exc:  # pragma: no cover - misconfiguration path
+    pytest.skip(f"CHIPIN_TEST_USERS is malformed: {exc}", allow_module_level=True)
 
 class ChipInTestContext:
     def __init__(self):

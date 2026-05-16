@@ -1,14 +1,17 @@
 package com.chipIn.ChipIn;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling
+@Slf4j
 public class ChipInApplication {
 
-  public static void main(String[] args) {
-    System.out.println("Starting ChipInApplication");
-    SpringApplication.run(ChipInApplication.class, args);
-  }
-
+    public static void main(String[] args) {
+        log.info("Starting ChipInApplication");
+        SpringApplication.run(ChipInApplication.class, args);
+    }
 }

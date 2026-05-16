@@ -1,0 +1,22 @@
+# Copy this file to `application-local.properties` (which is gitignored) and fill in.
+# Run with: SPRING_PROFILES_ACTIVE=local mvn spring-boot:run
+
+# Local Postgres (run via: docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16)
+spring.datasource.url=jdbc:postgresql://localhost:5432/chipin?currentSchema=chip_in_core
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+
+# Generate with: openssl rand -hex 64
+jwt.secret=REPLACE_ME_WITH_LOCAL_RANDOM_HEX_AT_LEAST_64_CHARS
+
+# Verbose logs only locally
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.orm.jdbc.bind=TRACE
+spring.jpa.show-sql=true
+
+# Local CORS for a Next.js or Expo dev server
+chipin.cors.allowed-origins=http://localhost:3000,http://localhost:8081
+
+# Use mock email locally — change to `resend` and set RESEND_API_KEY to actually send
+chipin.email.provider=mock
+chipin.email.from=no-reply@chipin.local

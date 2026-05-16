@@ -1,395 +1,381 @@
 # ChipIn API Contract
 
-This document outlines the core APIs available for the ChipIn UI integration. All `/api/**` endpoints require a Bearer token (JWT) to be passed in the `Authorization` header.
+This document describes the ChipIn backend API after the Phase 1–3 refactor. The JWT verification runs in an ingress sidecar (out of scope here); inside the app every `/api/**` endpoint expects a `Bearer` token whose subject identifies the current user. Swagger UI: `http://localhost:8080/swagger-ui/index.html`.
 
-Swagger UI is available at: `http://localhost:8080/swagger-ui/index.html` (once the app is running).
-
----
-
-## 1. Authentication (`/auth`)
-
-### 1.1 Signup
-*   **Endpoint**: `POST /auth/signup`
-*   **Description**: Register a new user. If the user's email already exists with a `PENDING_INVITE` status, this will update their account with the new details and activate it.
-*   **Input Body** (all fields mandatory except phone):
-    ```json
-    {
-      "name*": "John Doe",
-      "email*": "john@example.com",
-      "password*": "securepassword",
-      "phone": "1234567890"
-    }
-    ```
-*   **Output**: `200 OK` (User object)
-
-### 1.2 Login
-*   **Endpoint**: `POST /auth/login`
-*   **Description**: Authenticate and receive a JWT token.
-*   **Input Body** (all fields mandatory):
-    ```json
-    {
-      "email*": "john@example.com",
-      "password*": "securepassword"
-    }
-    ```
-*   **Output**: `200 OK`
-    ```json
-    {
-      "token": "eyJhbGci...",
-      "expiresIn": 86400000
-    }
-    ```
-
-### 1.3 Logout
-*   **Endpoint**: `POST /auth/logout`
-*   **Description**: Invalidate the user's token.
-*   **Input Body** (email mandatory):
-    ```json
-    {
-      "email*": "john@example.com"
-    }
-    ```
-*   **Output**: `200 OK` ("Logout Successful, Token invalidated!")
+Conventions:
+- All money is `BigDecimal`. Server enforces `> 0` for amounts.
+- All UUIDs are RFC 4122. ISO 4217 codes use 3 uppercase letters.
+- All timestamps are ISO 8601 (UTC by default).
+- Endpoints respond with `application/json`.
+- Validation failures return `400` with a JSON error body.
+- Authorization failures return `403`; resource-not-found returns `404`.
+- Endpoints that scope by group return `404` to non-members to avoid leaking existence.
 
 ---
 
-## 2. User Profile (`/api/users`)
+## 1. Currency Resolution Model
 
-### 2.1 Get Current User
-*   **Endpoint**: `GET /api/users/me`
-*   **Description**: Returns the profile details of the currently logged-in user.
-*   **Output**: `200 OK` (User entity)
+Every expense lives in a "bucket" — a `GroupCurrency` row. A bucket has:
 
-### 2.2 Update Profile
-*   **Endpoint**: `PUT /api/users/me`
-*   **Description**: Update current user's name, phone, or profile picture. All fields optional.
-*   **Input Body**:
-    ```json
-    {
-      "name": "John Updated",
-      "phone": "0987654321",
-      "profilePicUrl": "https://link.to/pic.png"
-    }
-    ```
-*   **Output**: `200 OK` (Updated User entity)
+- `originCurrency` — the currency the bucket is *denominated* in (e.g. `JPY` for a `YEN-Day1` bucket; the base bucket has `originCurrency == masterCurrency == groupDefault`).
+- `masterCurrency` — the true ISO currency the bucket converts to.
+- `exchangeRate` — 1 unit of the bucket = `exchangeRate` units of `masterCurrency`.
 
-### 2.3 Get Default Currency
-*   **Endpoint**: `GET /api/users/me/default-currency`
-*   **Description**: Fetches the default currency of the currently authenticated user.
-*   **Output**: `200 OK` (Currency object)
+The resolver converts amounts through a three-hop chain:
 
-### 2.4 Disable User
-*   **Endpoint**: `POST /api/users/disable`
-*   **Description**: Disables a user account (Admin only usually, currently open based on email).
-*   **Query Params**: `email*` (String)
-*   **Output**: `200 OK` ("User disabled successfully.")
+```
+amount(bucket) --bucket.exchangeRate--> masterCurrency
+              --FX row (origin=master, master=groupDefault)--> groupDefaultCurrency
+              --FX row (origin=groupDefault, master=userDefault)--> userDefaultCurrency
+```
 
-### 2.5 Enable User
-*   **Endpoint**: `POST /api/users/enable`
-*   **Description**: Enables a disabled user account.
-*   **Query Params**: `email*` (String)
-*   **Output**: `200 OK` ("User enabled successfully.")
+FX rows are also `GroupCurrency` rows but with `originCurrency != masterCurrency`. A daily job is expected to UPSERT these via `PUT /api/groups/{groupId}/fx-rates`. The same UPSERT is exposed to admins so they can override a rate manually.
 
-### 2.6 Search Users
-*   **Endpoint**: `GET /api/users/search`
-*   **Description**: Searches for users by name or email (case-insensitive). Useful for populating a dropdown or autocomplete field when adding users to a group.
-*   **Query Params**: `query*` (String)
-*   **Output**: `200 OK` (List of User objects)
+When any hop fails (no rate), responses surface the missing pair in a `missingRates: ["JPY->INR", ...]` array and leave the unresolved totals as `null`. Raw per-currency totals are always returned regardless.
 
-### 2.7 Get Friends
-*   **Endpoint**: `GET /api/users/friends`
-*   **Description**: Gets a list of all users the authenticated user shares a group with.
-*   **Output**: `200 OK` (List of `FriendResponse` objects)
-    ```json
-    [
-      {
-        "userId": "uuid",
-        "name": "Friend Name",
-        "email": "friend@example.com",
-        "profilePicUrl": "https://link.to/pic.png"
-      }
-    ]
-    ```
+Three views are exposed on every aggregate response:
+- `rawByCurrency` — totals per ISO master currency (no conversion).
+- `totalInGroupDefault` / `currencyCode` — aggregated in the group's default currency.
+- `totalInUserDefault` / `userDefaultCurrencyCode` — same, but in the viewer's default currency.
 
 ---
 
-## 3. Currencies (`/api/currencies`)
+## 1.1 Idempotent transactions
 
-### 3.1 Get Currencies
-*   **Endpoint**: `GET /api/currencies`
-*   **Description**: Fetch available currencies.
-*   **Query Params**: `groupId` (optional UUID) - Pass to fetch custom currencies specific to that group alongside global ones.
-*   **Output**: `200 OK` (List of Currency objects)
+State-changing money endpoints (settlements and expenses) **require** a client-generated `Idempotency-Key` HTTP header so retries — network blips, double-taps, app crashes mid-POST — do not create duplicate ledger entries.
 
-### 3.2 Get Currency by ID
-*   **Endpoint**: `GET /api/currencies/{id}`
-*   **Description**: Fetch a specific currency by ID.
-*   **Path Params**: `id*` (UUID)
-*   **Output**: `200 OK` (Currency object) or `404 Not Found`
+| Aspect | Detail |
+|--------|--------|
+| Header | `Idempotency-Key: <token>` |
+| Token format | 8–128 chars matching `[A-Za-z0-9_.-]`. UUIDv4 is the recommended generator. |
+| Scope | `(user_id, idempotency_key)` is unique. The endpoint path is also folded into the request hash; reusing one key across endpoints fails with 422. |
+| TTL | 24 hours from first successful use. After TTL, the key may be reused. |
+| Required on | `POST /api/settlements`, `POST /api/groups/{groupId}/expenses` |
 
-### 3.3 Create Currency
-*   **Endpoint**: `POST /api/currencies`
-*   **Description**: Create a new global currency.
-*   **Input Body** (Currency object with mandatory fields: code*, name*, symbol*)
-*   **Output**: `201 Created` (Currency object)
+Semantics on retry:
 
-### 3.4 Delete Currency
-*   **Endpoint**: `DELETE /api/currencies/{id}`
-*   **Description**: Delete a currency by ID.
-*   **Path Params**: `id*` (UUID)
-*   **Output**: `204 No Content`
+| Scenario | Behaviour |
+|----------|-----------|
+| First call | Action runs, response cached, returned to client. |
+| Retry with same key + same body | Cached response is returned **without** re-executing the action. |
+| Retry with same key + different body | `422 Idempotency-Key reused with a different request payload`. |
+| Two concurrent requests with same key | One wins on the unique constraint and commits; the loser's transaction (action included) is rolled back and returns `409 Concurrent request with the same Idempotency-Key; please retry`. Client's next retry hits the cached response. |
+| Missing/malformed header | `400 Idempotency-Key must be 8-128 characters of [A-Za-z0-9_.-]`. |
+| Wrapped action throws | Nothing is cached. Transaction rolls back. Client can retry the same key safely. |
 
----
+Example settlement retry sequence:
+```
+POST /api/settlements
+Idempotency-Key: 0c3b9c5a-1f2d-4e9b-8f1a-1c7b8e8a0a01
+{ "groupId": "...", "payerId": "...", "payeeId": "...", "amount": "250.00", "currencyId": "...", "notes": "Paid via UPI" }
 
-## 4. Groups (`/api/groups`)
+→ 200 OK
+{ "settlementId": "f0c6...", "message": "Settlement created successfully", "status": "SUCCESS" }
 
-### 4.1 Get My Groups (For Dropdowns)
-*   **Endpoint**: `GET /api/groups/me`
-*   **Description**: Get all groups the currently logged-in user is a part of. Useful for dropdowns.
-*   **Output**: `200 OK` (List of `GroupResponse` objects)
+# network glitch — client retries
+POST /api/settlements
+Idempotency-Key: 0c3b9c5a-1f2d-4e9b-8f1a-1c7b8e8a0a01
+{ ...same body... }
 
-### 4.2 Create Group
-*   **Endpoint**: `POST /api/groups`
-*   **Description**: Create a new group. The default currency MUST be a valid global currency. The authenticated user who creates the group is automatically added as an admin member.
-*   **Input Body** (mandatory fields marked with *):
-    ```json
-    {
-      "name*": "Goa Trip",
-      "description": "Fun times",
-      "imageUrl": "https://link.to/image.png",
-      "type*": "TRIP",
-      "simplifyDebt": true,
-      "defaultCurrencyId*": "<global-currency-uuid>"
-    }
-    ```
-*   **Output**: `200 OK` (GroupResponse object)
-
-### 4.3 Add Existing Member to Group
-*   **Endpoint**: `POST /api/groups/{groupId}/members`
-*   **Description**: Add an *already registered* user to a group. Only group admins can perform this action.
-*   **Path Params**: `groupId*` (UUID)
-*   **Input Body** (email mandatory):
-    ```json
-    {
-      "email*": "friend@example.com",
-      "isAdmin": false
-    }
-    ```
-*   **Output**: `200 OK` ("Member added successfully")
-
-### 4.4 Add Custom Currency to Group
-*   **Endpoint**: `POST /api/groups/{groupId}/currencies/{currencyId}`
-*   **Description**: Map an existing currency to a group with a specific custom name and locked exchange rate.
-*   **Path Params**: `groupId*` (UUID), `currencyId*` (UUID)
-*   **Query Params**: `name*` (String), `exchangeRate*` (Decimal)
-*   **Output**: `200 OK` (GroupCurrency object)
-
-### 4.5 Get Group Dashboard
-*   **Endpoint**: `GET /api/groups/{groupId}/dashboard`
-*   **Description**: The main view for a single group. Shows overall balances, list of expenses, and calculated settlements to square up.
-*   **Path Params**: `groupId*` (UUID)
-*   **Output**: `200 OK` (`GroupDashboardResponse`)
-    *   Includes `targetCurrencyId`, `userBalances`, `expenses`, and `settlements` arrays.
-
-### 4.6 Get Groups by User
-*   **Endpoint**: `GET /api/groups/user/{userId}`
-*   **Description**: Fetch groups for a specific user, including balance owed and last expense date.
-*   **Path Params**: `userId*` (UUID)
-*   **Output**: `200 OK` (`GroupsTabResponse`)
-    ```json
-    {
-      "groups": [
-        {
-          "group": {
-            "groupId": "uuid",
-            "name": "Goa Trip",
-            "description": "Fun times",
-            "imageUrl": "https://link.to/image.png",
-            "type": "TRIP",
-            "simplifyDebt": true,
-            "defaultCurrency": {
-              "currencyId": "uuid",
-              "code": "INR",
-              "name": "Indian Rupee",
-              "symbol": "₹",
-              "isActive": true
-            },
-            "createdBy": "uuid",
-            "createdAt": "2023-01-01T00:00:00",
-            "updatedAt": "2023-01-01T00:00:00"
-          },
-          "amountOwedByUser": 250.0,
-          "lastExpenseDate": "2023-01-15T12:00:00"
-        }
-      ]
-    }
-    ```
-
-### 4.7 Get Group Users
-*   **Endpoint**: `GET /api/groups/users/{groupId}`
-*   **Description**: Fetch all members (users) of a specific group. The authenticated user must be a member of the group.
-*   **Path Params**: `groupId*` (UUID)
-*   **Output**: `200 OK` (List of `FriendResponse` objects) or `403 Forbidden` if the user is not in the group.
-    ```json
-    [
-      {
-        "userId": "uuid",
-        "name": "Member Name",
-        "email": "member@example.com",
-        "profilePicUrl": "https://link.to/pic.png"
-      }
-    ]
-    ```
-
-### 4.8 Delete Group
-*   **Endpoint**: `DELETE /api/groups/{groupId}`
-*   **Description**: Delete a group. Only group admins can perform this action. If `hardDelete` is true, all expenses are marked as deleted. If false (default), the group is deleted only if there are unsettled expenses; otherwise, an error is thrown suggesting to use hard delete.
-*   **Path Params**: `groupId*` (UUID)
-*   **Query Params**: `hardDelete` (boolean, optional, default: false)
-*   **Output**: `200 OK` ("Group deleted successfully") or `400 Bad Request` (e.g., "Cannot delete group: There are unsettled expenses. Use hard delete to force deletion.") or `403 Forbidden` (if not an admin)
-
-### 4.9 Get Group Balances
-*   **Endpoint**: `GET /api/groups/{groupId}/balances`
-*   **Description**: Get the balances tab for a group, showing net balances per user from the current user's perspective and complete transaction history grouped by user pairs. Includes all expenses and settlements.
-*   **Path Params**: `groupId*` (UUID)
-*   **Output**: `200 OK` (`GroupBalancesResponse`)
-    ```json
-    {
-      "groupId": "uuid",
-      "groupName": "Goa Trip",
-      "currencyCode": "INR",
-      "userBalances": [
-        {
-          "userId": "uuid",
-          "userName": "Friend Name",
-          "netBalance": 250.0,
-          "balanceStatus": "Owes you"
-        }
-      ],
-      "transactionHistory": [
-        {
-          "otherUserId": "uuid",
-          "otherUserName": "Friend Name",
-          "netAmount": 250.0,
-          "transactions": [
-            {
-              "transactionId": "uuid",
-              "type": "EXPENSE",
-              "description": "Dinner",
-              "date": "2023-01-15T12:00:00",
-              "amount": 125.0,
-              "currencyCode": "INR"
-            }
-          ]
-        }
-      ]
-    }
-    ```
+→ 200 OK (replayed, no new ledger entry written)
+{ "settlementId": "f0c6...", "message": "Settlement created successfully", "status": "SUCCESS" }
+```
 
 ---
 
-## 5. Invitations (`/api/invitations`)
+## 2. Authentication (`/auth`)
 
-### 5.1 Invite New User
-*   **Endpoint**: `POST /api/invitations/invite`
-*   **Description**: Invites a new user to the platform. A temporary user account is created with `PENDING_INVITE` status, and an invitation email is sent (currently mocked). If a `groupId` is provided, the invited user is also added to that group as a non-admin member. If the user already exists and is in `PENDING_INVITE` status, the invitation is re-sent.
-*   **Input Body** (mandatory fields marked with *):
-    ```json
-    {
-      "email*": "newuser@example.com",
-      "name*": "New User",
-      "groupId": "optional-group-uuid"
-    }
-    ```
-*   **Output**: `201 Created` ("Invitation sent to newuser@example.com") or `400 Bad Request` (e.g., "User with this email already exists and is not pending invitation.")
+### 2.1 Signup — `POST /auth/signup`
+Body:
+```json
+{ "name": "John Doe", "email": "john@example.com", "password": "securepw1", "phone": "+1 555 123 4567" }
+```
+Returns `LoginResponse` (no password). `email` must be valid, `password` 8–128 chars, `phone` matches `^[+0-9 ()-]{7,32}$`.
 
-### 5.2 Register Invited User
-*   **Endpoint**: `POST /api/invitations/register`
-*   **Description**: Allows an invited user to complete their registration by setting a password. The user's status is changed from `PENDING_INVITE` to `ACTIVE`.
-*   **Input Body** (mandatory fields marked with *):
-    ```json
-    {
-      "token*": "invitation-token-uuid",
-      "password*": "newsecurepassword"
-    }
-    ```
-*   **Output**: `200 OK` ("User newuser@example.com registered successfully.") or `400 Bad Request` (e.g., "Invalid or expired invitation token.")
+### 2.2 Login — `POST /auth/login`
+Body:
+```json
+{ "email": "john@example.com", "password": "securepw1" }
+```
+Returns:
+```json
+{ "token": "...", "userId": "...", "name": "John", "email": "john@example.com" }
+```
+Failures return generic `Invalid credentials`.
+
+### 2.3 Logout — `POST /auth/logout`
+No body. Acts on the authenticated principal (rotates their `tokenVersion`). Replaces the previous endpoint that took `email` in a body and let anyone log out anyone.
 
 ---
 
-## 6. Home View (`/api/home`)
+## 3. User Profile (`/api/users`)
 
-### 6.1 Groups View
-*   **Endpoint**: `GET /api/home/groups`
-*   **Description**: Aggregates total owed/owe across all groups for the user.
-*   **Query Params**: `displayCurrencyId` (optional UUID) - The global currency to use for aggregation. If not provided, uses user's default currency or INR fallback.
-*   **Output**: `200 OK` (`HomeGroupsResponse`)
-    *   Includes total amounts and a breakdown array of `GroupSummaryDto` objects.
-
-### 6.2 Friends View
-*   **Endpoint**: `GET /api/home/friends`
-*   **Description**: Aggregates net balances strictly against individual friends across all shared groups.
-*   **Query Params**: `displayCurrencyId` (optional UUID) - Same as above.
-*   **Output**: `200 OK` (`HomeFriendsResponse`)
-    *   Includes total amounts and a breakdown array of `FriendSummaryDto` objects.
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/users/me` | Authenticated user's profile. |
+| `PUT /api/users/me` | Update name, phone, profilePicUrl. Body fields are optional; validation applied when present. |
+| `GET /api/users/me/default-currency` | Viewer's default currency. |
+| `POST /api/users/me/disable` | Self-suspend. Replaces the previous `POST /api/users/disable?email=` which let anyone suspend anyone. Admin moderation is out of scope today. |
+| `POST /api/users/me/enable` | Re-enable self. |
+| `GET /api/users/friends` | Users who share a group with the viewer. |
+| `GET /api/users/search?query=foo` | Returns `List<FriendResponse>` (never the user entity / password hash). |
 
 ---
 
-## 7. Expenses (`/api/groups/{groupId}/expenses`)
+## 4. Global Currencies (`/api/currencies`)
 
-### 7.1 Create Expense
-*   **Endpoint**: `POST /api/groups/{groupId}/expenses`
-*   **Description**: Record a new expense in a group.
-*   **Path Params**: `groupId*` (UUID)
-*   **Input Body** (mandatory fields marked with *):
-    ```json
-    {
-      "description*": "Dinner",
-      "amount*": 500.0,
-      "currencyId*": "<group-currency-uuid>",
-      "splitType*": "EQUAL",
-      "type": "FOOD",
-      "receiptImgUrl": "https://link.to/receipt.png",
-      "payers*": [ {"userId": "uuid", "paidAmount": 500.0} ],
-      "splits*": [ 
-          {"userId": "uuid", "amountOwed": 250.0},
-          {"userId": "uuid2", "amountOwed": 250.0}
-      ]
-    }
-    ```
-*   **Output**: `200 OK` (`SettlementResponse`)
-    ```json
-    {
-      "settlementId": "uuid",
-      "message": "Settlement created successfully",
-      "status": "SUCCESS"
-    }
-    ```
-
-*   **Notes**: Settlements are stored internally as `Expense` records with type `SETTLEMENT` but are excluded from the `expenses` array in the group dashboard. They appear in the `settlements` array and are included in balance calculations.
-
-### 7.2 Get Expense Details
-*   **Endpoint**: `GET /api/groups/{groupId}/expenses/{expenseId}`
-*   **Description**: Fetch details of a specific expense.
-*   **Path Params**: `groupId*` (UUID), `expenseId*` (UUID)
-*   **Output**: `200 OK` (`ExpenseDetailsResponse`)
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/currencies?groupId={uuid}` | List active globals (and legacy group-scoped rows, if any). |
+| `GET /api/currencies/{id}` | One currency. |
+| `POST /api/currencies` | Create a global currency. `group` must be null — group-scoped Currency rows are no longer supported; use group currencies (Section 6) instead. |
+| `DELETE /api/currencies/{id}` | Soft-delete a global currency. |
 
 ---
 
-## 8. Settlements (`/api/settlements`)
+## 5. Groups (`/api/groups`)
 
-### 8.1 Record Settlement (Payment)
-*   **Endpoint**: `POST /api/settlements`
-*   **Description**: Record a manual payment to settle debts. This is recorded natively as an expense of type `SETTLEMENT`.
-*   **Input Body** (mandatory fields marked with *):
-    ```json
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/groups` | Create a group; creator is auto-admin. Validates default currency. |
+| `GET /api/groups/me` | Groups the viewer belongs to. |
+| `POST /api/groups/{groupId}/members` | **Admin-only.** Add an existing user. Validated `AddMemberRequest`. |
+| `GET /api/groups/{groupId}/dashboard` | **Member-only.** See Section 7. |
+| `GET /api/groups/{groupId}/balances` | **Member-only.** See Section 7. |
+| `GET /api/groups/users/{groupId}` | **Member-only.** Members of the group. |
+| `DELETE /api/groups/{groupId}?hardDelete=true|false` | **Admin-only.** Soft-delete requires fully settled balances. `hardDelete=true` marks all expenses deleted and removes the group. |
+
+---
+
+## 6. Group Currencies (`/api/groups/{groupId}/currencies`)
+
+### 6.1 List — `GET /api/groups/{groupId}/currencies`
+Member-only. Returns a list of `GroupCurrencyResponse`:
+```json
+{
+  "groupCurrencyId": "...",
+  "groupId": "...",
+  "name": "YEN-Day1",
+  "masterCurrencyId": "...", "masterCurrencyCode": "JPY",
+  "originCurrencyId": null, "originCurrencyCode": null,
+  "exchangeRate": "0.74",
+  "kind": "BUCKET",            // BUCKET = expense bucket, FX_RATE = resolver-only row
+  "createdAt": "2026-05-16T01:00:00",
+  "createdByUserId": "..."
+}
+```
+
+### 6.2 Create custom bucket — `POST /api/groups/{groupId}/currencies`
+Admin-only.
+```json
+{ "name": "YEN-Day1", "masterCurrencyId": "<JPY-uuid>", "exchangeRate": "0.74" }
+```
+- `name` 1–80 chars, unique within the group.
+- `exchangeRate > 0`, at most 13 integer + 6 fractional digits.
+- `masterCurrencyId` must be an active global currency.
+
+### 6.3 Update bucket — `PUT /api/groups/{groupId}/currencies/{groupCurrencyId}`
+Admin-only. Body fields optional:
+```json
+{ "name": "YEN-Day1 (updated)", "exchangeRate": "0.78" }
+```
+Cannot change the master currency (would corrupt historical expenses).
+
+### 6.4 Delete bucket — `DELETE /api/groups/{groupId}/currencies/{groupCurrencyId}`
+Admin-only, soft-delete. Rejected if the bucket is referenced by an expense or is the base bucket.
+
+### 6.5 Upsert FX rate — `PUT /api/groups/{groupId}/fx-rates`
+Admin-only. Idempotent (no duplicate rows). Used by daily-refresh job and manual admin overrides.
+```json
+{ "fromCurrencyId": "<JPY-uuid>", "toCurrencyId": "<INR-uuid>", "rate": "0.56" }
+```
+
+---
+
+## 7. Dashboard & Balances
+
+### 7.1 `GET /api/groups/{groupId}/dashboard`
+Member-only. Returns `GroupDashboardResponse`:
+```json
+{
+  "groupId": "...", "groupName": "Goa Trip",
+  "targetCurrencyId": "<INR-uuid>",
+  "currencyCode": "INR",
+  "userDefaultCurrencyCode": "INR",
+  "missingRates": [],
+  "userBalances": [
     {
-      "groupId*": "<uuid>",
-      "payerId*": "<uuid-who-paid>",
-      "payeeId*": "<uuid-who-received>",
-      "amount*": 250.0,
-      "currencyId*": "<group-currency-uuid>",
-      "notes": "Paid back via Venmo"
+      "userId": "...", "userName": "Alice",
+      "netBalance": "250.00",
+      "netBalanceInUserDefault": "250.00",
+      "rawByCurrency": {"INR": "250.00"}
     }
-    ```
-*   **Output**: `200 OK` (Confirmation string)
+  ],
+  "expenses": [
+    {
+      "expenseId": "...", "description": "Dinner", "date": "...",
+      "category": "FOOD", "type": "EXPENSE", "createdByName": "Alice",
+      "yourNetShare": "125.00", "formattedShare": "You lent",
+      "bucketName": "Base INR", "masterCurrencyCode": "INR"
+    }
+  ],
+  "settlements": [
+    {"payerId": "...", "payerName": "Bob", "payeeId": "...", "payeeName": "Alice", "amount": "100.00"}
+  ]
+}
+```
+
+### 7.2 `GET /api/groups/{groupId}/balances`
+Member-only. Returns `GroupBalancesResponse`. Each entry in `userBalances` and `transactionHistory` carries:
+- `netBalance` in the group's default currency,
+- `netBalanceInUserDefault` (null if FX missing),
+- `rawByCurrency` map per ISO code.
+
+The top-level `rawByCurrency` is the viewer's net by ISO currency, and `missingRates` lists any unresolved FX pairs.
+
+---
+
+## 8. Expenses (`/api/groups/{groupId}/expenses`)
+
+### 8.1 `POST /api/groups/{groupId}/expenses`
+Member-only. Body:
+```json
+{
+  "description": "Dinner",
+  "amount": "500.00",
+  "currencyId": "<bucket-or-global-uuid>",
+  "category": "FOOD",
+  "splitType": "EQUAL",                  // EQUAL | EXACT | PERCENTAGE | SHARES
+  "receiptImgUrl": null,
+  "payers": [{"userId": "...", "paidAmount": "500.00"}],
+  "splits": [
+    {"userId": "...", "amountOwed": null, "rawValue": null},
+    {"userId": "...", "amountOwed": null, "rawValue": null}
+  ]
+}
+```
+
+Headers:
+- `Idempotency-Key: <token>` (required — see §1.1).
+
+Server-side rules (P1 fix):
+- All `payers` and `splits` users must be members of the group.
+- `sum(payers.paidAmount) == amount` (±0.01 tolerance).
+- For `EQUAL`: `amountOwed` is recomputed from `amount / N`, last person absorbs rounding.
+- For `PERCENTAGE`: `sum(rawValue) == 100` (±0.01); `amountOwed` is recomputed.
+- For `SHARES`: `sum(rawValue) > 0`; `amountOwed` is recomputed pro-rata.
+- For `EXACT`: caller's `amountOwed` is preserved; `sum(splits) == amount` required.
+- `currencyId` may be either a `GroupCurrency` UUID *in this group* or a global `Currency` UUID (server auto-creates a base bucket for it).
+
+Returns the new expense UUID as a string.
+
+### 8.2 `GET /api/groups/{groupId}/expenses/{expenseId}`
+Member-only. Returns `ExpenseDetailsResponse` with bucket name, bucket rate, master currency code, and amount projected into the group's default currency.
+
+---
+
+## 9. Settlements (`/api/settlements`)
+
+### 9.1 `POST /api/settlements`
+Headers:
+- `Idempotency-Key: <token>` (required — see §1.1).
+
+Validations:
+- `payerId != payeeId`.
+- Both users are members of the group.
+- The authenticated user is either `payerId` or a group admin (P1 fix).
+- `amount > 0`.
+
+Body:
+```json
+{
+  "groupId": "...",
+  "payerId": "...",
+  "payeeId": "...",
+  "amount": "250.00",
+  "currencyId": "<bucket-or-global-uuid>",
+  "notes": "Paid via UPI"
+}
+```
+
+Returns:
+```json
+{ "settlementId": "...", "message": "Settlement created successfully", "status": "SUCCESS" }
+```
+
+---
+
+## 10. Invitations (`/api/invitations`)
+
+### 10.1 `POST /api/invitations/invite`
+Authenticated. If `groupId` is provided, the caller must be an admin of that group (P1 fix).
+```json
+{ "email": "newuser@example.com", "name": "New User", "groupId": null }
+```
+
+### 10.2 `POST /api/invitations/register`
+Token-bearing — does not require an existing session.
+```json
+{ "token": "<invitation-token>", "password": "newpassword1" }
+```
+
+---
+
+## 11. Home View (`/api/home`)
+
+### 11.1 `GET /api/home/groups?displayCurrencyId={uuid}`
+Aggregates net balances across all the viewer's groups.
+- `displayCurrencyId` defaults to viewer default → falls back to `INR`.
+- Returns `HomeGroupsResponse` with `totalOwedToYou`, `totalYouOwe`, `rawByCurrency`, `missingRates`, and a per-group `GroupSummaryDto` carrying both `netBalanceInGroupDefault` and `netBalanceInDisplayCurrency`.
+
+### 11.2 `GET /api/home/friends?displayCurrencyId={uuid}`
+Same shape but pivoted on friends. Each friend entry exposes `rawByCurrency`.
+
+---
+
+## 12. Schema changes (run once)
+
+```sql
+ALTER TABLE chip_in_core.group_currencies
+    ADD COLUMN IF NOT EXISTS origin_currency_id UUID
+        REFERENCES chip_in_core.currencies(currency_id);
+
+ALTER TABLE chip_in_core.group_currencies
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+UPDATE chip_in_core.group_currencies
+SET origin_currency_id = master_currency_id
+WHERE origin_currency_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_group_currencies_group_origin_master
+    ON chip_in_core.group_currencies (groupid, origin_currency_id, master_currency_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_group_currencies_group_origin_master
+    ON chip_in_core.group_currencies (groupid, origin_currency_id, master_currency_id)
+    WHERE origin_currency_id IS NOT NULL AND is_active = TRUE;
+
+-- Idempotency cache for retried POSTs (§1.1)
+CREATE TABLE IF NOT EXISTS chip_in_core.idempotency_keys (
+    id                UUID PRIMARY KEY,
+    user_id           UUID         NOT NULL,
+    idempotency_key   VARCHAR(128) NOT NULL,
+    endpoint          VARCHAR(256) NOT NULL,
+    request_hash      VARCHAR(64)  NOT NULL,
+    response_status   INT          NOT NULL,
+    response_body     TEXT,
+    response_type     VARCHAR(256),
+    created_at        TIMESTAMP    NOT NULL DEFAULT now(),
+    expires_at        TIMESTAMP    NOT NULL,
+    CONSTRAINT uq_idempotency_user_key UNIQUE (user_id, idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_idempotency_expires_at
+    ON chip_in_core.idempotency_keys (expires_at);
+```
+
+> A periodic job to delete rows older than `expires_at` is not yet implemented;
+> Hibernate `ddl-auto` will create the table on next startup, but the index/
+> constraint statements above are safe to apply manually too. Until a cleanup
+> job exists, expired rows are also pruned lazily on the next request that
+> references the same `(user_id, key)`.
+

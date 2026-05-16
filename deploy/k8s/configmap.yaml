@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chipin-service-config
+  namespace: chipin
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  SERVER_PORT: "8080"
+  # Comma-separated list of trusted browser origins
+  CHIPIN_CORS_ALLOWED_ORIGINS: "https://app.chipin.example"
+  # Email
+  CHIPIN_EMAIL_PROVIDER: "resend"
+  CHIPIN_EMAIL_FROM: "no-reply@chipin.example"
+  CHIPIN_FRONTEND_URL: "https://app.chipin.example"
+  # Sidecar will handle authn; the app keeps `chipin.security.enabled` true so
+  # the in-app Spring Security filter still scopes routes appropriately when
+  # the sidecar adds the X-Authenticated-User headers.
+  CHIPIN_SECURITY_ENABLED: "true"

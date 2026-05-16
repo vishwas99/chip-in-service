@@ -2,13 +2,11 @@ package com.chipIn.ChipIn.entities;
 
 import com.chipIn.ChipIn.entities.enums.AuthProvider;
 import com.chipIn.ChipIn.entities.enums.UserStatus;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-// 🚨 THESE ARE THE CRITICAL IMPORTS FOR YOUR ERROR 🚨
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -19,12 +17,12 @@ import java.util.Collections;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users") // Matches our DB Schema
-@Data // Lombok: Getters, Setters, ToString
+@Table(name = "users")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString
+@ToString(exclude = {"password", "invitationToken"})
 public class User implements UserDetails {
 
     @Id
@@ -43,8 +41,9 @@ public class User implements UserDetails {
     @Column(name = "profile_pic_url")
     private String profilePicUrl;
 
+    @JsonIgnore
     @Column(name = "password_hash")
-    private String password; // Implements UserDetails
+    private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "auth_provider")
@@ -54,6 +53,7 @@ public class User implements UserDetails {
     @Column(name = "oauth_provider_id")
     private String oauthProviderId;
 
+    @JsonIgnore
     @Column(name = "token_version")
     @Builder.Default
     private Integer tokenVersion = 1;
@@ -89,6 +89,7 @@ public class User implements UserDetails {
     @Builder.Default
     private Long version = 0L;
 
+    @JsonIgnore
     @Column(name = "invitation_token")
     private String invitationToken;
 

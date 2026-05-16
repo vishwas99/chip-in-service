@@ -15,13 +15,18 @@ import com.chipIn.ChipIn.repository.UserRepository;
 import com.chipIn.ChipIn.repository.CurrencyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,11 +46,9 @@ public class UserService implements UserDetailsService {
         if (existingUser.isPresent()) {
             User user = existingUser.get();
             if (user.getStatus() == UserStatus.PENDING_INVITE) {
-                // Update name if different
                 if (!user.getName().equals(signupRequest.getName())) {
                     user.setName(signupRequest.getName());
                 }
-                // Set password and other fields
                 user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
                 user.setPhone(signupRequest.getPhone());
                 user.setStatus(UserStatus.ACTIVE);
@@ -54,14 +57,13 @@ public class UserService implements UserDetailsService {
                 user.setInvitationTokenExpiryDate(null);
                 return userRepository.save(user);
             } else {
-                throw new RuntimeException("User already exists");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "User already exists");
             }
         }
 
-        // Set default currency to INR
-        Currency defaultCurrency = currencyRepository.findByCode("INR").orElseThrow(
-                () -> new RuntimeException("Default currency INR not found")
-        );
+        Currency defaultCurrency = currencyRepository.findByCode("INR")
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Default currency INR not seeded"));
 
         User user = User.builder().name(signupRequest.getName())
                 .email(signupRequest.getEmail())
@@ -78,26 +80,30 @@ public class UserService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return null;
+        return userRepository.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
 
+    @Transactional(readOnly = true)
     public User getUserByEmail(String email){
-        Optional<User> user = userRepository.findByEmail(email);
-        return user.orElse(null);
+        return userRepository.findByEmail(email).orElse(null);
     }
 
-    public void disableUser(String email){
-        User user = userRepository.findByEmail(email).orElseThrow(
-                () -> new RuntimeException("User not found")
-        );
+    /**
+     * Suspend the authenticated user's own account. Admin-driven moderation
+     * (suspending other users) lives in a separate admin surface that this
+     * service intentionally does not expose.
+     */
+    public void disableSelf(User currentUser) {
+        User user = userRepository.findById(currentUser.getUserid())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         user.setStatus(UserStatus.SUSPENDED);
         userRepository.save(user);
     }
 
-    public void enableUser(String email){
-        User user = userRepository.findByEmail(email).orElseThrow(
-                () -> new RuntimeException("User not found")
-        );
+    public void enableSelf(User currentUser) {
+        User user = userRepository.findById(currentUser.getUserid())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
     }
@@ -115,47 +121,59 @@ public class UserService implements UserDetailsService {
         return userRepository.save(currentUser);
     }
 
+    @Transactional(readOnly = true)
     public List<User> searchUsers(String query) {
         return userRepository.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(query);
     }
 
-    public List<FriendResponse> getFriends(UUID userId) {
-        log.info("Fetching friends for userId: {}", userId);
+    /**
+     * Directory search, paginated. Never returns the password hash or any
+     * token-bearing field (uses {@link FriendResponse}).
+     */
+    @Transactional(readOnly = true)
+    public Page<FriendResponse> searchUsersForDirectory(String query, Pageable pageable) {
+        List<User> all = searchUsers(query);
+        return paginate(all, pageable, this::toFriendResponse);
+    }
 
-        // 1. Find all groups the user is a member of
+    @Transactional(readOnly = true)
+    public Page<FriendResponse> getFriends(UUID userId, Pageable pageable) {
         List<GroupMember> memberships = groupMemberRepository.findByIdUserId(userId);
-        log.info("Found {} group memberships for userId: {}", memberships.size(), userId);
 
-        // 2. Get all unique user IDs from those groups
         Set<UUID> friendIds = new HashSet<>();
         for (GroupMember membership : memberships) {
             UUID groupId = membership.getGroup().getGroupId();
-            log.debug("Processing group: {}", groupId);
             List<GroupMember> groupMembers = groupMemberRepository.findByGroupGroupId(groupId);
             groupMembers.forEach(member -> friendIds.add(member.getUser().getUserid()));
         }
-        log.info("Collected {} unique user IDs from shared groups before filtering current user.", friendIds.size());
-
-        // 3. Remove the current user's ID
         friendIds.remove(userId);
-        log.info("Collected {} unique user IDs from shared groups after filtering current user.", friendIds.size());
 
+        if (friendIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
 
-        // 4. Fetch the User objects for the friend IDs (excluding deleted users)
         List<User> friends = userRepository.findByIdInActive(friendIds);
-        log.info("Fetched {} User objects for friend IDs.", friends.size());
-
-        // 5. Map to DTO
-        List<FriendResponse> friendResponses = friends.stream()
-                .map(friend -> FriendResponse.builder()
-                        .userId(friend.getUserid())
-                        .name(friend.getName())
-                        .email(friend.getEmail())
-                        .profilePicUrl(friend.getProfilePicUrl())
-                        .build())
-                .collect(Collectors.toList());
-        log.info("Returning {} FriendResponse objects.", friendResponses.size());
-        return friendResponses;
+        log.debug("getFriends userId={} count={}", userId, friends.size());
+        return paginate(friends, pageable, this::toFriendResponse);
     }
 
+    private FriendResponse toFriendResponse(User u) {
+        return FriendResponse.builder()
+                .userId(u.getUserid())
+                .name(u.getName())
+                .email(u.getEmail())
+                .profilePicUrl(u.getProfilePicUrl())
+                .build();
+    }
+
+    /** In-memory pagination helper for endpoints whose underlying repo method
+     *  doesn't yet support {@link Pageable}. Switch to a paged JPA query when
+     *  these lists outgrow the page size. */
+    private static <S, T> Page<T> paginate(List<S> all, Pageable pageable, java.util.function.Function<S, T> mapper) {
+        int total = all.size();
+        int start = (int) Math.min((long) pageable.getOffset(), total);
+        int end = (int) Math.min(start + (long) pageable.getPageSize(), total);
+        List<T> slice = all.subList(start, end).stream().map(mapper).collect(Collectors.toList());
+        return new PageImpl<>(slice, pageable, total);
+    }
 }

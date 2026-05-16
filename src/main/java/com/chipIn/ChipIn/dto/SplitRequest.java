@@ -1,23 +1,29 @@
 package com.chipIn.ChipIn.dto;
 
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import lombok.NonNull;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * One row in the split list. `amountOwed` is required for EXACT splits but
+ * the server recomputes it for EQUAL/PERCENTAGE/SHARES — see
+ * `ExpenseService.normaliseSplits`. `rawValue` carries percent / share counts
+ * for those types and is ignored for EXACT.
+ */
 @Data
 public class SplitRequest {
-    @NonNull
+    @NotNull
     private UUID userId;
 
-    // The final calculated share of the expense for this user
-    @Min(0)
+    @DecimalMin(value = "0", message = "amountOwed must be >= 0")
+    @Digits(integer = 15, fraction = 4)
     private BigDecimal amountOwed;
 
-    // Useful for PERCENTAGE/SHARES.
-    // e.g., if splitType is PERCENTAGE, rawValue = 20.0 (for 20%)
-    @Min(0)
+    @DecimalMin(value = "0", message = "rawValue must be >= 0")
+    @Digits(integer = 15, fraction = 4)
     private BigDecimal rawValue;
 }

@@ -1,32 +1,49 @@
 package com.chipIn.ChipIn.dto;
 
+import com.chipIn.ChipIn.entities.enums.SplitType;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
-import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 @Data
-@ToString
 public class CreateExpenseRequest {
+
+    @NotBlank
+    @Size(max = 255)
     private String description;
 
-    // Total amount in the specific currency (e.g., 5000 Yen)
+    @NotNull
+    @DecimalMin(value = "0", inclusive = false, message = "amount must be > 0")
+    @Digits(integer = 15, fraction = 4)
     private BigDecimal amount;
 
-    // The ID of the Master Currency (e.g., INR, USD) OR the Custom Group Currency
+    @NotNull
     private UUID currencyId;
 
-    // Optional categorization: "FOOD", "TRAVEL", "HOTEL", etc.
-    private String type;
+    /** Optional category label (e.g. FOOD, TRAVEL). */
+    @Size(max = 64)
+    private String category;
 
-    // "EQUAL", "PERCENTAGE", "EXACT", "SHARES"
-    private String splitType;
+    @NotNull
+    private SplitType splitType;
 
+    @Size(max = 1024)
     private String receiptImgUrl;
 
-    // The lists of financial distribution
+    @NotEmpty
+    @Valid
     private List<PayerRequest> payers;
+
+    @NotEmpty
+    @Valid
     private List<SplitRequest> splits;
 }

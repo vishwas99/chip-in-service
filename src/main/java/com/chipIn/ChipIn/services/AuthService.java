@@ -24,42 +24,44 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        log.info(request.toString());
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new RuntimeException("User is not active");
+            throw new RuntimeException("Invalid credentials");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
         }
 
-        // Update Last Login
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        // GENERATE TOKEN
         String jwtToken = jwtService.generateToken(user);
+        log.info("Login successful for userId={}", user.getUserid());
 
         return LoginResponse.builder()
                 .token(jwtToken)
-                .userId(user.getUserid()) // Added userId
+                .userId(user.getUserid())
                 .name(user.getName())
                 .email(user.getEmail())
                 .build();
     }
 
-    public void logout(String email) {
-        // 1. Find the user
-        User user = userRepository.findByEmail(email)
+    /**
+     * Invalidates the authenticated user's current token by rotating their
+     * tokenVersion. Acts on the principal — does not accept an email param
+     * because that would let any caller log out arbitrary users.
+     */
+    public void logout(User currentUser) {
+        if (currentUser == null) {
+            throw new RuntimeException("Authentication required");
+        }
+        User user = userRepository.findById(currentUser.getUserid())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // 2. Increment the token version
-        user.setTokenVersion(user.getTokenVersion() + 1);
-
-        // 3. Save the update
+        Integer version = user.getTokenVersion() == null ? 1 : user.getTokenVersion();
+        user.setTokenVersion(version + 1);
         userRepository.save(user);
+        log.info("Logout / token rotation for userId={}", user.getUserid());
     }
 }
